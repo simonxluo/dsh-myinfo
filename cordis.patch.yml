@@ -1,0 +1,8 @@
+# dsh-myinfo — 个人信息管理插件（个人档案 / 工作经历 / 人际关系 / 人生感悟 / 资产台账）
+#
+# 插件自带 agent 工具（personal_identity 等 5 个）与设置页面板；
+# 数据落在 $DSH_HOME/integrations/dsh-myinfo/data.json（0600）。
+- insert:
+    - id: myinfo
+      name: dsh-myinfo
+      config: {}

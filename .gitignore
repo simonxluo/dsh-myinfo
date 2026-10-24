@@ -1,0 +1,28 @@
+# 运行期个人数据 —— 绝不入库（本插件的核心边界）
+# 真实档案位于 $DSH_HOME/integrations/dsh-myinfo/，为防误拷进仓库，按名字全局排除：
+data.json
+*.local.json
+*.private.json
+test-data/
+fixtures/
+
+# 依赖与构建产物
+node_modules/
+lib/
+dist/
+*.tsbuildinfo
+
+# 环境与密钥
+.env
+.env.*
+
+# 编辑器/系统（._* 为 macOS 在 exFAT 卷上的 AppleDouble 垃圾）
+.DS_Store
+._*
+*.swp
+.idea/
+.vscode/
+
+# 日志
+*.log
+npm-debug.log*
