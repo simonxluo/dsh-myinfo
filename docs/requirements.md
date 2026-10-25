@@ -1,6 +1,6 @@
 # dsh-myinfo 需求文档（含数据建模与功能表单）
 
-> 版本：v0.1.0 · 状态：已按本文档实现并通过 Host 端单元测试（`test/host.test.mjs`）
+> 版本：v0.2.0 · 状态：已实现并通过单元测试（含多模型 workflow 评审回归项）；评审记录见 `docs/workflow-report.md`
 
 ## 1. 需求分析
 
@@ -84,6 +84,8 @@ profile
 | salary.notes | 说明 | ≤500 |
 | updatedAt | 修改时间 | ISO 时间戳 |
 
+> 所有列表条目（career / relations / reflections / accounts / holdings）均携带服务端生成的 `updatedAt`（ISO 时间戳，每次保存刷新）；id 由服务端按前缀+序号分配，并持久化序号水位线——删除后不复用旧 id。
+
 **relations（人际关系）**：
 
 | 字段 | 含义 | 约束 |
@@ -128,15 +130,23 @@ profile
 | shares | 股数 | 必填 > 0，4 位小数 |
 | costPrice | 成本价 | 数字可空 |
 | price | 最新价 | 数字可空；市值 = shares × (price ?? costPrice ?? 0) |
+| notes | 备注 | ≤300 |
 
-### 2.3 派生视图（不落盘，读取时计算）
+### 2.3 口径约定
 
-- `identity.age`：由 birthDate 计算周岁。
+- **stock 账户 balance 的语义 = 现金/可用资金**（不含证券市值），避免与持仓市值双计；券商总资产请在备注说明。
+- **持仓市值统一按 CNY 计入合计**；非 CNY 标的请换算成 CNY 后填写 price。
+- **在职**：endDate 为空即"在职"，允许多条并存（兼职/顾问）；UI 以徽标逐条标记。
+- **持仓→账户为弱引用**（账户 id 或名称）：删除账户不级联删除持仓；未匹配到账户的"孤儿持仓"在明细表按原引用文本展示。
+
+### 2.4 派生视图（不落盘，读取时计算）
+
+- `identity.age`：由 birthDate 按本地时区计算周岁。
 - `career[].current`：`endDate` 为空即在职；列表按 startDate 倒序。
 - `reflections[]`：按 date 倒序。
-- `assets.totals`：按币种聚合 `{bank, pay, stock, holdings, grand}`；grand = 三类余额 + 持仓市值。
+- `assets.totals`：账户按各自 currency 分桶聚合 `{bank, pay, stock}`；持仓市值统一计入 CNY 桶的 `holdings`；`grand` = 三类余额 + 持仓市值（桶内求和）。
 
-### 2.4 实体关系（ER 概览）
+### 2.5 实体关系（ER 概览）
 
 ```
 identity (1)

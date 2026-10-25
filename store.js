@@ -13,7 +13,7 @@
  *   assets      accounts[]（银行卡/支付宝/微信/股票账户余额）
  *               holdings[]（股票持仓：同花顺等账户的代码/股数/成本/现价）
  */
-import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { chmodSync, closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { homedir } from 'node:os';
 
@@ -34,8 +34,6 @@ export function dataFile() {
 // 基础形状与加载/保存
 // ---------------------------------------------------------------------------
 
-const ID_PREFIX = { career: 'c', relation: 'r', reflection: 'f', account: 'a', holding: 'h' };
-
 export function emptyIdentity() {
 	return {
 		name: '', gender: '', birthDate: '', birthplace: '', origin: '', residence: '',
@@ -51,7 +49,7 @@ export function emptyProfile() {
 		relations: [],
 		reflections: [],
 		assets: { accounts: [], holdings: [] },
-		meta: { createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+		meta: { createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), idSeq: {} },
 	};
 }
 
@@ -63,13 +61,33 @@ function normalizeProfile(doc) {
 	for (const key of Object.keys(emptyIdentity())) {
 		if (typeof identity[key] === 'string') profile.identity[key] = identity[key];
 	}
+	// 读路径兜底：手工编辑/半截写入可能混入数组或字符串数字；对象之外的元素直接丢弃，
+	// 数字字段尽力 Number() 收敛（失败置 null，汇总按 0 计），避免 "[object Object]" 或字符串拼接污染。
+	const isEntry = (x) => x !== null && typeof x === 'object' && !Array.isArray(x);
+	const num = (v) => {
+		if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+		if (typeof v === 'string' && v.trim() !== '') {
+			const n = Number(v.replace(/[,，\s]/g, ''));
+			return Number.isFinite(n) ? n : null;
+		}
+		return null;
+	};
 	for (const key of ['career', 'relations', 'reflections']) {
-		if (Array.isArray(doc[key])) profile[key] = doc[key].filter((x) => x !== null && typeof x === 'object');
+		if (Array.isArray(doc[key])) profile[key] = doc[key].filter(isEntry);
 	}
 	const assets = (doc.assets !== null && typeof doc.assets === 'object') ? doc.assets : {};
-	if (Array.isArray(assets.accounts)) profile.assets.accounts = assets.accounts.filter((x) => x !== null && typeof x === 'object');
-	if (Array.isArray(assets.holdings)) profile.assets.holdings = assets.holdings.filter((x) => x !== null && typeof x === 'object');
+	if (Array.isArray(assets.accounts)) {
+		profile.assets.accounts = assets.accounts.filter(isEntry).map((x) => ({ ...x, balance: num(x.balance) }));
+	}
+	if (Array.isArray(assets.holdings)) {
+		profile.assets.holdings = assets.holdings.filter(isEntry).map((x) => ({
+			...x, shares: num(x.shares), costPrice: num(x.costPrice), price: num(x.price),
+		}));
+	}
 	if (doc.meta !== null && typeof doc.meta === 'object') {
+		if (doc.meta.idSeq !== null && typeof doc.meta.idSeq === 'object' && !Array.isArray(doc.meta.idSeq)) {
+			profile.meta.idSeq = doc.meta.idSeq;
+		}
 		if (typeof doc.meta.createdAt === 'string') profile.meta.createdAt = doc.meta.createdAt;
 		if (typeof doc.meta.updatedAt === 'string') profile.meta.updatedAt = doc.meta.updatedAt;
 	}
@@ -100,19 +118,10 @@ export function saveProfile(profile) {
 	mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
 	const tmp = join(dirname(file), '.data.json.tmp');
 	writeFileMode(tmp, JSON.stringify(profile, null, '\t') + '\n', 0o600);
+	// fsync 数据文件后再 rename：掉电时 rename 不会跑在数据落盘之前。
+	const fd = openSync(tmp, 'r+');
+	try { fsyncSync(fd); } finally { closeSync(fd); }
 	renameSync(tmp, file);
-}
-
-// ---------------------------------------------------------------------------
-// 变更通道与订阅（工具与面板共用；UI 在 agent 改动后也能感知）
-// ---------------------------------------------------------------------------
-
-const listeners = new Set();
-
-/** 订阅档案变更，返回退订函数。 */
-export function subscribe(listener) {
-	listeners.add(listener);
-	return () => listeners.delete(listener);
 }
 
 /**
@@ -124,9 +133,6 @@ export function mutate(fn) {
 	const result = fn(profile);
 	profile.meta.updatedAt = new Date().toISOString();
 	saveProfile(profile);
-	for (const listener of listeners) {
-		try { listener(profile); } catch { /* 订阅者异常不阻塞写入 */ }
-	}
 	return { result, profile };
 }
 
@@ -139,6 +145,9 @@ const ID_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 
 /** 单行文本：去首尾空白、去掉控制字符、限长。 */
 function line(value, { max = 200, required = false, label = 'value' } = {}) {
+	if (value !== undefined && value !== null && typeof value !== 'string') {
+		throw new StoreError(`${label} 需是字符串`);
+	}
 	const text = String(value ?? '').replace(/[\u0000-\u001f\u007f]/g, '').trim();
 	if (required && text.length === 0) throw new StoreError(`${label} 不能为空`);
 	if (text.length > max) throw new StoreError(`${label} 超过 ${max} 字符`);
@@ -171,7 +180,16 @@ function when(value, { required = false, label = 'date' } = {}) {
 		if (required) throw new StoreError(`${label} 不能为空（YYYY / YYYY-MM / YYYY-MM-DD）`);
 		return '';
 	}
-	if (!/^\d{4}(-\d{2}){0,2}$/.test(s)) throw new StoreError(`${label} 需为 YYYY / YYYY-MM / YYYY-MM-DD`);
+	const m = /^(\d{4})(?:-(\d{2}))?(?:-(\d{2}))?$/.exec(s);
+	if (m === null) throw new StoreError(`${label} 需为 YYYY / YYYY-MM / YYYY-MM-DD`);
+	if (m[2] !== undefined) {
+		const month = Number(m[2]);
+		if (month < 1 || month > 12) throw new StoreError(`${label} 月份需在 01-12`);
+		if (m[3] !== undefined) {
+			const day = Number(m[3]);
+			if (day < 1 || day > 31) throw new StoreError(`${label} 日期需在 01-31`);
+		}
+	}
 	return s;
 }
 
@@ -180,6 +198,7 @@ function money(value, { label = 'amount' } = {}) {
 	if (value === undefined || value === null || value === '') return null;
 	const n = typeof value === 'number' ? value : Number(String(value).replace(/[,，\s]/g, ''));
 	if (!Number.isFinite(n)) throw new StoreError(`${label} 需是数字`);
+	if (Math.abs(n) >= 1e13) throw new StoreError(`${label} 超出可记录范围（|值| < 1e13）`);
 	return Math.round(n * 100) / 100;
 }
 
@@ -198,16 +217,6 @@ function tags(value) {
 
 export function validId(id) {
 	return typeof id === 'string' && ID_RE.test(id);
-}
-
-function nextId(list, kind) {
-	const prefix = ID_PREFIX[kind];
-	let max = 0;
-	for (const entry of list) {
-		const m = /^([a-z])(\d+)$/.exec(String(entry?.id ?? ''));
-		if (m !== null && m[1] === prefix) max = Math.max(max, Number(m[2]));
-	}
-	return prefix + (max + 1);
 }
 
 const IDENTITY_KEYS = Object.keys(emptyIdentity());
@@ -229,12 +238,16 @@ export function careerEntry(input) {
 	if (input === null || typeof input !== 'object') throw new StoreError('career 需是对象');
 	const salaryIn = (input.salary !== null && typeof input.salary === 'object') ? input.salary : {};
 	const period = ['monthly', 'annual', 'hourly', 'total', 'other'].includes(salaryIn.period) ? salaryIn.period : 'monthly';
+	const startDate = when(input.startDate, { required: true, label: 'startDate' });
+	const endDate = when(input.endDate, { label: 'endDate' });
+	// 同族格式下字典序即时间序（YYYY < YYYY-MM < YYYY-MM-DD），跨字段先后可直接比较。
+	if (endDate !== '' && endDate < startDate) throw new StoreError('endDate 不能早于 startDate');
 	return {
 		company: line(input.company, { max: 120, required: true, label: 'company' }),
 		title: line(input.title, { max: 120, required: true, label: 'title' }),
 		location: line(input.location, { max: 120, label: 'location' }),
-		startDate: when(input.startDate, { required: true, label: 'startDate' }),
-		endDate: when(input.endDate, { label: 'endDate' }),
+		startDate,
+		endDate,
 		content: text(input.content, { max: 20000, label: 'content' }),
 		salary: {
 			amount: money(salaryIn.amount, { label: 'salary.amount' }),
@@ -310,12 +323,14 @@ export function holdingEntry(input) {
 /** 由生日计算周岁；未知返回 null。 */
 export function ageOf(birthDate) {
 	if (typeof birthDate !== 'string' || !DATE_RE.test(birthDate)) return null;
-	const birth = new Date(birthDate + 'T00:00:00Z');
+	const parts = birthDate.split('-').map(Number);
+	// 用本地时区构造与比较：生日是本地历法概念，避免 UTC 日界在东八区凌晨少算一岁。
+	const birth = new Date(parts[0], parts[1] - 1, parts[2]);
 	if (Number.isNaN(birth.getTime())) return null;
 	const now = new Date();
-	let age = now.getUTCFullYear() - birth.getUTCFullYear();
-	const beforeBirthday = now.getUTCMonth() < birth.getUTCMonth()
-		|| (now.getUTCMonth() === birth.getUTCMonth() && now.getUTCDate() < birth.getUTCDate());
+	let age = now.getFullYear() - birth.getFullYear();
+	const beforeBirthday = now.getMonth() < birth.getMonth()
+		|| (now.getMonth() === birth.getMonth() && now.getDate() < birth.getDate());
 	if (beforeBirthday) age -= 1;
 	return age >= 0 && age < 150 ? age : null;
 }

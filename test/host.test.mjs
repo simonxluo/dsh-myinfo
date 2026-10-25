@@ -3,7 +3,7 @@
  * 用临时 DSH_HOME，不触碰真实档案；直接断言 store 与工具的核心行为。
  */
 import { equal, rejects } from 'node:assert/strict';
-import { mkdtempSync, rmSync, readFileSync, statSync } from 'node:fs';
+import { mkdtempSync, rmSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -97,5 +97,40 @@ const rendered = (await byName.get('personal_assets').output.render)({}, await a
 equal(rendered[0].type, 'text');
 if (!rendered[0].text.includes('招商银行')) throw new Error('render should mention bank account');
 
+
+// --- workflow 评审修复回归 ---
+// id 水位线：删除最大 id 后不复用
+const wm1 = await career.execute({ action: 'add', entry: { company: 'W1', title: 'T', startDate: '2020' } });
+const wm2 = await career.execute({ action: 'add', entry: { company: 'W2', title: 'T', startDate: '2021' } });
+await career.execute({ action: 'delete', id: wm2.id });
+const wm3 = await career.execute({ action: 'add', entry: { company: 'W3', title: 'T', startDate: '2022' } });
+equal(wm3.id > wm2.id, true, `id watermark: expect > ${wm2.id}, got ${wm3.id}`);
+
+// 不可能日期被拒绝
+await rejects(() => career.execute({ action: 'add', entry: { company: 'X', title: 'Y', startDate: '2025-13-45' } }), /月份|日期|YYYY/);
+// endDate 早于 startDate 被拒绝
+await rejects(() => career.execute({ action: 'add', entry: { company: 'X', title: 'Y', startDate: '2024-05', endDate: '2020-01' } }), /endDate/);
+// 非字符串字段被拒绝（不再变成 [object Object]）
+await rejects(() => identity.execute({ action: 'patch', patch: { name: { evil: 1 } } }), /需是字符串/);
+// update 缺 id 被拒绝（不再静默变 add）
+await rejects(() => career.execute({ action: 'update', entry: { company: 'X', title: 'Y', startDate: '2024' } }), /update 需要提供 id/);
+// 金额超范围被拒绝
+await rejects(() => assets.execute({ action: 'save-account', account: { kind: 'bank', name: '巨款', balance: 1e13 } }), /范围/);
+
+// 读路径兜底：数组元素与字符串数字被收敛
+const dataPath = join(dir, 'integrations', 'dsh-myinfo', 'data.json');
+const doc = JSON.parse(readFileSync(dataPath, 'utf8'));
+doc.career.push(['not', 'an', 'object']);
+doc.assets.accounts.push({ id: 'a99', kind: 'bank', name: '手改', balance: '12345.6' });
+writeFileSync(dataPath, JSON.stringify(doc));
+const dirty = await assets.execute({ action: 'get' });
+equal(dirty.assets.accounts.some((x) => x.id === 'a99' && x.balance === 12345.6), true, 'string balance coerced');
+equal(dirty.career.some((x) => Array.isArray(x)), false, 'array entries dropped');
+
+// render 回归：add 动作返回 {id, action, profile} 包装，渲染入口必须能解包
+const addRender = await career.execute({ action: 'add', entry: { company: 'R公司', title: 'T', startDate: '2023' } });
+const renderedAdd = (await career.output.render)({}, addRender);
+if (!renderedAdd[0].text.includes('R公司')) throw new Error('render should unwrap wrapper output');
+
 rmSync(dir, { recursive: true, force: true });
-console.log('ALL HOST TESTS PASSED');
+console.log('ALL HOST TESTS PASSED (incl. audit regressions)');

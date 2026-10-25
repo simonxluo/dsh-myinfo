@@ -1,6 +1,6 @@
 # dsh-myinfo 设计文档（控制流 / 数据流 / 模块）
 
-> 前置：数据建模见 `docs/requirements.md`（先建模，后设计）。版本 v0.1.0。
+> 前置：数据建模见 `docs/requirements.md`（先建模，后设计）。版本 v0.2.0（含 workflow 评审修复）。
 
 ## 1. 模块划分
 
@@ -80,7 +80,7 @@ agent：工具 get/list ──▶ loadProfile() ──▶ profileView()（派生
 UI   ：GET panel ──────▶ loadProfile() ──▶ profileView() ──▶ JSON
 ```
 
-读路径无缓存：数据量（KB 级）下每次读文件的简单性优于失效管理。
+读路径无缓存：数据量（KB 级）下每次读文件的简单性优于失效管理。UI 刷新策略 = 自身提交成功后重新 GET（agent 改动不推送，面板手动刷新可见）。
 
 ### 2.4 UI 装配（浏览器半）
 
@@ -96,6 +96,7 @@ window.__ModuleLoader__.load({ id:'dsh-myinfo', factory })
 ```
 
 组件内部：挂载时 GET 全量视图 → 每次提交后重新 GET；无本地副本的乐观更新（避免双写不一致）。
+样式约定：全部 CSS 以 `dmi-` 前缀作用域化，由 `ensureStyle()` 在首次挂载时向 `document.head` 注入一次（幂等，卸载重挂不叠加）。
 
 ## 3. 数据流
 
@@ -126,11 +127,13 @@ profileView()                             （派生：age / current / 排序 / t
 ### 3.2 id 数据流
 
 ```
-新增请求(无 id) ──▶ ids.nextIdIn(list, kind) ──▶ 'c3'/'r2'/'a5'…
+新增请求(无 id) ──▶ ids.nextIdIn(list, kind, meta.idSeq) ──▶ 'c3'/'r2'/'a5'…
+                    序号 = max(列表最大, 水位线) + 1，并回写水位线
 更新/删除(带 id) ──▶ validId() 校验 ──▶ 命中条目；未命中 → StoreError（不静默新建）
+                                    update 缺 id → StoreError（不会静默变成新增）
 ```
 
-id 仅服务端生成、永不复用（删除后 max+1 继续前进，避免引用歧义）。
+id 仅服务端生成；`meta.idSeq` 持久化水位线保证删除最大 id 后不复用旧 id。
 
 ### 3.3 资产汇总数据流
 
@@ -165,7 +168,7 @@ git           ──.gitignore 排除 data.json/本地数据──▶ 只提交�
 | D4 | 派生字段不落盘 | age/current/totals 随读取计算，避免"过了生日数据过期"类不一致 |
 | D5 | webServer 可选注入 | headless profile 无 UI 也能用工具 |
 | D6 | id 前缀 + max+1 | 人读友好（c3=career#3）、稳定、无 UUID 噪音 |
-| D7 | 持仓挂账户（id 或名称）而非硬外键 | 允许"先记持仓后建账户"的口述顺序；视图层做名称匹配展示 |
+| D7 | 持仓挂账户（id 或名称）而非硬外键 | 允许"先记持仓后建账户"的口述顺序；展示层把 id 解析为账户名，孤儿持仓按原引用文本显示 |
 
 ## 5. 验证策略
 

@@ -318,6 +318,7 @@ function careerFormOf(entry) {
 		content: (entry && entry.content) || "",
 		salaryAmount: salary.amount === undefined || salary.amount === null ? "" : String(salary.amount),
 		salaryPeriod: salary.period || "monthly",
+		salaryCurrency: salary.currency || "CNY",
 		salaryNotes: salary.notes || "",
 	};
 }
@@ -335,7 +336,7 @@ function CareerTab(props) {
 			entry: {
 				company: f.company, title: f.title, location: f.location,
 				startDate: f.startDate, endDate: f.endDate, content: f.content,
-				salary: { amount: f.salaryAmount === "" ? null : Number(f.salaryAmount), period: f.salaryPeriod, notes: f.salaryNotes },
+				salary: { amount: f.salaryAmount === "" ? null : Number(f.salaryAmount), period: f.salaryPeriod, currency: f.salaryCurrency, notes: f.salaryNotes },
 			},
 		}).then(() => setEditing(null));
 		return h("div", { className: "dmi-form" },
@@ -349,6 +350,7 @@ function CareerTab(props) {
 				Field({ label: t("f.salaryPeriod") },
 					Select({ value: f.salaryPeriod, onChange: setF("salaryPeriod") },
 						["monthly", "annual", "hourly", "total", "other"].map((p) => h("option", { key: p, value: p }, t("period." + p))))),
+				Field({ label: t("f.salaryCurrency") }, Input({ value: f.salaryCurrency, placeholder: "CNY", onChange: setF("salaryCurrency") })),
 				Field({ label: t("f.content"), wide: true }, TextArea({ value: f.content, onChange: setF("content") }))),
 			h("div", { className: "dmi-actions" },
 				h(Btn, { variant: "primary", busy, onClick: save }, t("action.save")),
@@ -456,7 +458,8 @@ function ReflectionsTab(props) {
 	const { view, post, busy } = props;
 	const [editing, setEditing] = useState(null);
 	const reflections = view.reflections || [];
-	const todayStr = new Date().toISOString().slice(0, 10);
+	const now = new Date();
+	const todayStr = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0") + "-" + String(now.getDate()).padStart(2, "0");
 
 	if (editing !== null) {
 		const f = editing.form;
@@ -470,7 +473,7 @@ function ReflectionsTab(props) {
 				Field({ label: t("f.date") }, Input({ type: "date", value: f.date, onChange: setF("date") })),
 				Field({ label: t("f.reflectionTitle") }, Input({ value: f.title, onChange: setF("title") })),
 				Field({ label: t("f.tags") }, Input({ value: f.tags, onChange: setF("tags") })),
-				Field({ label: t("f.notes"), wide: true }, TextArea({ value: f.content, onChange: setF("content") }))),
+				Field({ label: t("f.reflectionContent"), wide: true }, TextArea({ value: f.content, onChange: setF("content") }))),
 			h("div", { className: "dmi-actions" },
 				h(Btn, { variant: "primary", busy, onClick: save }, t("action.save")),
 				h(Btn, { onClick: () => setEditing(null) }, t("action.cancel"))));
@@ -535,6 +538,11 @@ function AssetsTab(props) {
 	const holdings = assets.holdings || [];
 	const stockAccounts = accounts.filter((x) => x.kind === "stock");
 	const kindLabel = (kind) => t("kind." + kind);
+	// 持仓归属账户：id 优先解析为账户名，名称/未知引用原样显示（孤儿持仓可见）。
+	const accountLabel = (ref) => {
+		const hit = accounts.find((x) => x.id === ref) || accounts.find((x) => x.name === ref);
+		return hit ? hit.name + (hit.mask ? "（" + hit.mask + "）" : "") : ref;
+	};
 
 	if (acctForm !== null) {
 		const f = acctForm.form;
@@ -611,13 +619,14 @@ function AssetsTab(props) {
 					entry.notes ? h("div", { className: "dmi-muted" }, entry.notes) : null,
 					h("div", { className: "dmi-actions" },
 						h(Btn, { size: "sm", onClick: () => setAcctForm({ id: entry.id, form: accountFormOf(entry) }) }, t("action.edit")),
-						h(Btn, { size: "sm", variant: "danger", onClick: () => { if (window.confirm(t("confirm.delete"))) post("account-delete", { id: entry.id }); } }, t("action.delete")))))),
-				kind === "stock" && holdings.length > 0 ? h("div", null,
-					h("div", { className: "dmi-section-title" }, t("holdings.of")),
-					h("table", { className: "dmi-table" },
-						h("thead", null, h("tr", null, ["f.account", "f.code", "f.name", "f.shares", "f.costPrice", "f.price", ""].map((k) => h("th", { key: k }, k === "" ? "" : t(k))))),
-						h("tbody", null, holdings.map((entry) => h("tr", { key: entry.id },
-							h("td", null, entry.account),
+						h(Btn, { size: "sm", variant: "danger", onClick: () => { if (window.confirm(t("confirm.delete"))) post("account-delete", { id: entry.id }); } }, t("action.delete")))))));
+		}),
+		holdings.length > 0 ? h("div", null,
+			h("div", { className: "dmi-section-title" }, t("holdings.of")),
+			h("table", { className: "dmi-table" },
+				h("thead", null, h("tr", null, ["f.account", "f.code", "f.name", "f.shares", "f.costPrice", "f.price", ""].map((k) => h("th", { key: k }, k === "" ? "" : t(k))))),
+				h("tbody", null, holdings.map((entry) => h("tr", { key: entry.id },
+					h("td", null, accountLabel(entry.account)),
 							h("td", null, entry.code),
 							h("td", null, entry.name || t("misc.none")),
 							h("td", null, entry.shares),
@@ -626,8 +635,7 @@ function AssetsTab(props) {
 							h("td", { style: { whiteSpace: "nowrap" } },
 								h(Btn, { size: "sm", onClick: () => setHoldForm({ id: entry.id, form: holdingFormOf(entry) }) }, t("action.edit")),
 								" ",
-								h(Btn, { size: "sm", variant: "danger", onClick: () => { if (window.confirm(t("confirm.delete"))) post("holding-delete", { id: entry.id }); } }, t("action.delete")))))))) : null);
-		}),
+							h(Btn, { size: "sm", variant: "danger", onClick: () => { if (window.confirm(t("confirm.delete"))) post("holding-delete", { id: entry.id }); } }, t("action.delete")))))))) : null,
 
 		h("div", { className: "dmi-actions" },
 			h(Btn, { onClick: () => setAcctForm({ id: null, form: accountFormOf(null) }) }, t("action.addAccount")),
@@ -639,6 +647,21 @@ function AssetsTab(props) {
 // ---------------------------------------------------------------------------
 
 const TAB_KEYS = ["identity", "career", "relations", "reflections", "assets"];
+
+/** 样式只注入一次：挂载/卸载往返不会在文档里叠加重复的 <style> 节点。 */
+var styleInjected = false;
+function ensureStyle() {
+	if (styleInjected || typeof document === "undefined") return;
+	if (document.getElementById("dsh-myinfo-style") !== null) {
+		styleInjected = true;
+		return;
+	}
+	const el = document.createElement("style");
+	el.id = "dsh-myinfo-style";
+	el.textContent = STYLE_CSS;
+	document.head.appendChild(el);
+	styleInjected = true;
+}
 
 function MyInfoSection(props, ctx) {
 	const [, setLangTick] = useState(0);
@@ -680,8 +703,8 @@ function MyInfoSection(props, ctx) {
 	}, [load]);
 
 	const tabProps = { view, post, busy };
+	ensureStyle();
 	return h("div", { className: "dmi-root" },
-		h("style", null, STYLE_CSS),
 		h("div", { className: "dmi-head" },
 			h("h3", null, t("title")),
 			view && view.meta ? h("span", { className: "dmi-updated" }, t("hint.updatedAt") + "：" + String(view.meta.updatedAt || "").replace("T", " ").slice(0, 19)) : null,

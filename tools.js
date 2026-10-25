@@ -118,11 +118,12 @@ function renderAssets(view) {
 	}
 	if (holdings.length > 0) {
 		lines.push('\n**持仓明细**');
+		const accountName = new Map(accounts.map((x) => [x.id, x.name + (x.mask ? `（${x.mask}）` : '')]));
 		for (const holding of holdings) {
 			const price = holding.price ?? holding.costPrice;
 			const value = price === null || price === undefined ? null : Math.round(holding.shares * price * 100) / 100;
 			lines.push(
-				`- ${holding.account} · ${holding.code}${holding.name ? ' ' + holding.name : ''}：`
+				`- ${accountName.get(holding.account) ?? holding.account} · ${holding.code}${holding.name ? ' ' + holding.name : ''}：`
 				+ `${holding.shares} 股，成本 ${holding.costPrice === null ? '—' : holding.costPrice}，`
 				+ `现价 ${holding.price === null || holding.price === undefined ? '—' : holding.price}`
 				+ (value === null ? '' : `，市值 ${fmtMoney(value)}`),
@@ -153,7 +154,7 @@ function upsertInto(listFn, kind, value, id, label) {
 			list[index] = { id, ...value, updatedAt: new Date().toISOString() };
 			return { id, action: 'update' };
 		}
-		const next = { id: nextIdIn(list, kind), ...value, updatedAt: new Date().toISOString() };
+		const next = { id: nextIdIn(list, kind, profile.meta), ...value, updatedAt: new Date().toISOString() };
 		list.push(next);
 		return { id: next.id, action: 'add' };
 	});
@@ -205,14 +206,14 @@ export function buildTools() {
 					action: { type: 'string', enum: ['get', 'patch'], description: 'get 读取；patch 部分更新' },
 					patch: {
 						type: 'object',
-						additionalProperties: { type: 'string' },
-						description: '要更新的字段：name/gender/birthDate/birthplace/origin/residence/phone/email/notes',
+						additionalProperties: true,
+						description: '要更新的字段（仅接受字符串值）：name/gender/birthDate/birthplace/origin/residence/phone/email/notes',
 					},
 				},
 				required: ['action'],
 				additionalProperties: false,
 			},
-			output: { schema: OBJ_SCHEMA, render: (_a, v) => block(renderIdentity(v)) },
+			output: { schema: OBJ_SCHEMA, render: (_a, v) => block(renderIdentity(v && v.profile !== undefined ? v.profile : v)) },
 			async execute(rawArgs) {
 				const args = rawArgs || {};
 				const action = str(args, 'action');
@@ -245,11 +246,14 @@ export function buildTools() {
 				required: ['action'],
 				additionalProperties: false,
 			},
-			output: { schema: OBJ_SCHEMA, render: (_a, v) => block(renderCareer(v)) },
+			output: { schema: OBJ_SCHEMA, render: (_a, v) => block(renderCareer(v && v.profile !== undefined ? v.profile : v)) },
 			async execute(rawArgs) {
 				const args = rawArgs || {};
 				const action = str(args, 'action');
 				if (action === 'list') return profileView(loadProfile());
+				if (action === 'update' && (typeof args.id !== 'string' || args.id.trim() === '')) {
+					throw new StoreError('update 需要提供 id（先 list 查询）');
+				}
 				if (action === 'add' || action === 'update') {
 					const value = careerEntry(args.entry);
 					const { result } = upsertInto(careerList, 'career', value, action === 'update' ? str(args, 'id') : '', '工作经历');
@@ -279,11 +283,14 @@ export function buildTools() {
 				required: ['action'],
 				additionalProperties: false,
 			},
-			output: { schema: OBJ_SCHEMA, render: (_a, v) => block(renderRelations(v)) },
+			output: { schema: OBJ_SCHEMA, render: (_a, v) => block(renderRelations(v && v.profile !== undefined ? v.profile : v)) },
 			async execute(rawArgs) {
 				const args = rawArgs || {};
 				const action = str(args, 'action');
 				if (action === 'list') return profileView(loadProfile());
+				if (action === 'update' && (typeof args.id !== 'string' || args.id.trim() === '')) {
+					throw new StoreError('update 需要提供 id（先 list 查询）');
+				}
 				if (action === 'add' || action === 'update') {
 					const value = relationEntry(args.entry);
 					const { result } = upsertInto(relationList, 'relation', value, action === 'update' ? str(args, 'id') : '', '人际关系');
@@ -312,11 +319,14 @@ export function buildTools() {
 				required: ['action'],
 				additionalProperties: false,
 			},
-			output: { schema: OBJ_SCHEMA, render: (_a, v) => block(renderReflections(v)) },
+			output: { schema: OBJ_SCHEMA, render: (_a, v) => block(renderReflections(v && v.profile !== undefined ? v.profile : v)) },
 			async execute(rawArgs) {
 				const args = rawArgs || {};
 				const action = str(args, 'action');
 				if (action === 'list') return profileView(loadProfile());
+				if (action === 'update' && (typeof args.id !== 'string' || args.id.trim() === '')) {
+					throw new StoreError('update 需要提供 id（先 list 查询）');
+				}
 				if (action === 'add' || action === 'update') {
 					const value = reflectionEntry(args.entry);
 					const { result } = upsertInto(reflectionList, 'reflection', value, action === 'update' ? str(args, 'id') : '', '人生感悟');
@@ -353,7 +363,7 @@ export function buildTools() {
 				required: ['action'],
 				additionalProperties: false,
 			},
-			output: { schema: OBJ_SCHEMA, render: (_a, v) => block(renderAssets(v)) },
+			output: { schema: OBJ_SCHEMA, render: (_a, v) => block(renderAssets(v && v.profile !== undefined ? v.profile : v)) },
 			async execute(rawArgs) {
 				const args = rawArgs || {};
 				const action = str(args, 'action');

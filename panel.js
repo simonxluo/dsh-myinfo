@@ -80,9 +80,13 @@ function readJsonBody(request, response) {
 			if (size > 256 * 1024) {
 				if (!response.writableEnded && !response.destroyed) {
 					sendPanelJson(response, 413, { ok: false, error: { code: 'too-large', message: 'request body exceeds 256 KiB' } });
+					// 等响应真正发完再断开请求，避免 413 响应体被截断。
+					response.once('finish', () => request.destroy());
+					response.once('close', () => request.destroy());
+				} else {
+					request.destroy();
 				}
 				reject(fail('too-large', 'body too large'));
-				request.destroy();
 				return;
 			}
 			chunks.push(chunk);
@@ -112,7 +116,7 @@ function upsert(listFn, kind, value, id, label) {
 			list[index] = { id, ...value, updatedAt: new Date().toISOString() };
 			return { id, action: 'update' };
 		}
-		const next = { id: nextIdIn(list, kind), ...value, updatedAt: new Date().toISOString() };
+		const next = { id: nextIdIn(list, kind, profile.meta), ...value, updatedAt: new Date().toISOString() };
 		list.push(next);
 		return { id: next.id, action: 'add' };
 	});
@@ -206,9 +210,18 @@ export function installPanelWeb(ctx) {
 						sendPanelJson(response, outcome.status, { ok: true, value: outcome.value });
 					}
 				} catch (error) {
-					const status = error instanceof StoreError ? 400 : 500;
+					// readJsonBody 的 kind 分流在前：畸形请求体是客户端问题（400），不是服务端 500，
+					// 且不回传解析器细节；其余按业务错 400 / 内部错 500。
+					let status = error instanceof StoreError ? 400 : 500;
+					let code = 'error';
+					let message = firstLine(error?.message ?? String(error));
+					if (error?.kind === 'bad-json') {
+						status = 400; code = 'bad-json'; message = 'invalid JSON body';
+					} else if (error?.kind === 'too-large') {
+						status = 413; code = 'too-large'; message = 'request body too large';
+					}
 					if (!response.headersSent) {
-						sendPanelJson(response, status, { ok: false, error: { code: 'error', message: firstLine(error?.message ?? String(error)) } });
+						sendPanelJson(response, status, { ok: false, error: { code, message } });
 					} else {
 						response.end();
 					}
