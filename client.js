@@ -79,6 +79,11 @@ zh: {
 	"f.mask": "尾号/标识", "f.balance": "余额", "f.currency": "币种",
 	"f.account": "归属账户", "f.code": "代码", "f.market": "市场", "f.shares": "股数", "f.costPrice": "成本价", "f.price": "现价",
 	"panel.title": "个人档案",
+	"theme.toDark": "切换深色外观",
+	"theme.toLight": "切换浅色外观",
+	"dock.title": "个人档案",
+	"dock.dock": "在右侧停靠",
+	"dock.identity": "基本资料",
 	"ov.title": "资产速览",
 	"ov.open": "打开完整档案",
 	"ov.empty": "暂无资产 · 点击录入",
@@ -122,6 +127,11 @@ en: {
 	"f.mask": "Mask", "f.balance": "Balance", "f.currency": "Currency",
 	"f.account": "Account", "f.code": "Code", "f.market": "Market", "f.shares": "Shares", "f.costPrice": "Cost", "f.price": "Price",
 	"panel.title": "Profile",
+	"theme.toDark": "Switch to dark appearance",
+	"theme.toLight": "Switch to light appearance",
+	"dock.title": "Profile",
+	"dock.dock": "Dock to right",
+	"dock.identity": "Identity",
 	"ov.title": "Assets",
 	"ov.open": "Open full profile",
 	"ov.empty": "No assets yet",
@@ -264,16 +274,7 @@ const STYLE_CSS = ""
 
 /** 明暗主题：优先宿主 theme 服务，回退系统 prefers-color-scheme。 */
 function darkClassOf(ctx) {
-	try {
-		const theme = (ctx && ctx.theme) || (typeof ctx.get === "function" ? ctx.get("theme") : undefined);
-		if (theme && typeof theme.getTheme === "function") {
-			const snap = theme.getTheme();
-			const id = String((snap && (snap.id || snap.themeId)) || "");
-			if (id.indexOf("dark") >= 0 || snap && snap.dark === true) return " dmi-dark";
-			if (id !== "") return "";
-		}
-	} catch (e) { /* 无 theme 服务则走系统偏好 */ }
-	return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? " dmi-dark" : "";
+	return effectiveDark(ctx) ? " dmi-dark" : "";
 }
 
 
@@ -290,6 +291,59 @@ function ensureStyle() {
 	el.textContent = STYLE_CSS;
 	document.head.appendChild(el);
 	styleInjected = true;
+}
+
+
+// ---------------------------------------------------------------------------
+// 外观：手动深浅切换（localStorage 持久化），未手动选择时跟随宿主/系统
+// ---------------------------------------------------------------------------
+
+const THEME_KEY = "dsh-myinfo.theme"; // "light" | "dark" | 无（自动）
+var manualTheme = null;
+try { manualTheme = localStorage.getItem(THEME_KEY) || null; } catch (e) { /* 无 localStorage 则仅内存态 */ }
+var themeListeners = new Set();
+function setManualTheme(mode) {
+	manualTheme = mode;
+	try {
+		if (mode) localStorage.setItem(THEME_KEY, mode);
+		else localStorage.removeItem(THEME_KEY);
+	} catch (e) { /* 忽略持久化失败 */ }
+	for (const fn of themeListeners) { try { fn(); } catch (e2) {} }
+}
+function systemDark() {
+	return !!(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+}
+function autoDark(ctx) {
+	try {
+		const theme = (ctx && ctx.theme) || (typeof ctx.get === "function" ? ctx.get("theme") : undefined);
+		if (theme && typeof theme.getTheme === "function") {
+			const snap = theme.getTheme();
+			const id = String((snap && (snap.id || snap.themeId)) || "");
+			if (id.indexOf("dark") >= 0 || (snap && snap.dark === true)) return true;
+			if (id !== "") return false;
+		}
+	} catch (e) { /* 回退系统偏好 */ }
+	return systemDark();
+}
+function effectiveDark(ctx) {
+	if (manualTheme === "dark") return true;
+	if (manualTheme === "light") return false;
+	return autoDark(ctx);
+}
+/** ☀️/🌙 切换按钮：手动覆盖外观，三处界面共用。 */
+function ThemeToggle(props) {
+	const [, tick] = useState(0);
+	useEffect(() => {
+		const fn = () => tick((v) => v + 1);
+		themeListeners.add(fn);
+		return () => { themeListeners.delete(fn); };
+	}, []);
+	const dark = effectiveDark(props && props.ctx);
+	return h("button", {
+		className: "dmi-btn dmi-btn--sm",
+		title: dark ? t("theme.toLight") : t("theme.toDark"),
+		onClick: () => setManualTheme(dark ? "light" : "dark"),
+	}, dark ? "☀️" : "🌙");
 }
 
 // ---------------------------------------------------------------------------
@@ -799,7 +853,8 @@ function MyInfoSection(props, ctx) {
 			h("div", { className: "dmi-head" },
 				h("h3", null, t("title")),
 				view && view.meta ? h("span", { className: "dmi-updated" }, t("hint.updatedAt") + "：" + String(view.meta.updatedAt || "").replace("T", " ").slice(0, 19)) : null,
-				h(Btn, { size: "sm", onClick: load }, t("action.refresh"))),
+				h(Btn, { size: "sm", onClick: load }, t("action.refresh")),
+				h(ThemeToggle, { ctx })),
 			h("div", { className: "dmi-sub" }, t("subtitle")),
 			error ? h("div", { className: "dmi-error" }, error) : null,
 			h("div", { className: "dmi-seg" }, TAB_KEYS.map((key) =>
@@ -836,7 +891,14 @@ function MyInfoPanel(props, ctx) {
 			h("div", { style: { flex: 1, minWidth: 220 } },
 				h("h2", { className: "dmi-page-title" }, t("panel.title")),
 				h("div", { className: "dmi-page-sub" }, who || t("subtitle"))),
+			h(Btn, { size: "sm", onClick: () => {
+				try {
+					const r = (typeof ctx.get === "function" ? ctx.get("sidebarRight") : undefined) || ctx.sidebarRight;
+					if (r && typeof r.openTab === "function") r.openTab(DOCK_KIND, { params: {} });
+				} catch (e) { /* 右栏服务不可用则忽略 */ }
+			} }, t("dock.dock")),
 			h(Btn, { size: "sm", onClick: load }, t("action.refresh")),
+			h(ThemeToggle, { ctx }),
 			grand !== null ? h(Chip, { tone: "money", title: t("stat.grand") }, fmtMoney(grand)) : null),
 		h("div", { className: "dmi-seg", style: { marginBottom: 16 } }, TAB_KEYS.map((key) =>
 			h("button", { key, className: tab === key ? "is-active" : "", onClick: () => setTab(key) }, t("tab." + key)))),
@@ -886,6 +948,7 @@ function AssetOverlay(props, ctx) {
 		h("div", { className: "dmi-ov-card" },
 			h("div", { className: "dmi-ov-head" },
 				h("span", { className: "dmi-ov-title" }, t("ov.title")),
+				h("span", { style: { display: "inline-flex" } }, h(ThemeToggle, { ctx })),
 				h("button", { className: "dmi-ov-x", title: t("action.cancel"), onClick: () => setExpanded(false) }, "✕")),
 			h("div", { className: "dmi-ov-hero" },
 				h("b", null, cny ? fmtMoney(cny.grand) : t("misc.none")),
@@ -898,6 +961,58 @@ function AssetOverlay(props, ctx) {
 			h("div", { className: "dmi-ov-foot" },
 				h(Btn, { size: "sm", variant: "primary", onClick: openPanel }, t("ov.open")),
 				h(Btn, { size: "sm", onClick: load }, t("action.refresh")))));
+}
+
+
+// ---------------------------------------------------------------------------
+// 右侧停靠面板（sidebar.right.pane.tab，窄列摘要视图）
+// ---------------------------------------------------------------------------
+
+const DOCK_ID = "dsh-myinfo-dock";   // definition.id = body/title 注册 key
+const DOCK_KIND = "myinfo.profile";  // openTab 的 kind
+
+/** 窄列档案摘要：基本资料 + 资产速览 + 跳转完整档案。 */
+function MyInfoDock(props, ctx) {
+	const { view, error, load } = useMyInfoData();
+	const [, tick] = useState(0);
+	useEffect(() => {
+		relocalize = () => tick((v) => v + 1);
+		return () => { relocalize = null; };
+	}, []);
+	useEffect(() => { load(); }, [load]);
+	const id = (view && view.identity) || {};
+	const assets = (view && view.assets) || { accounts: [], holdings: [], totals: { totals: {} } };
+	const cny = ((assets.totals && assets.totals.totals) || {}).CNY || null;
+	const who = [id.name || "—", id.age !== null && id.age !== undefined ? id.age + " 岁" : "", id.residence].filter(Boolean).join(" · ");
+	ensureStyle();
+	return h("div", { className: "dmi-scope" + darkClassOf(ctx), style: { padding: "16px 14px", display: "flex", flexDirection: "column", gap: 12, minHeight: "100%" } },
+		h("div", { className: "dmi-head" },
+			h("h3", { style: { margin: 0, fontSize: 16 } }, t("dock.title")),
+			h("div", { style: { marginLeft: "auto", display: "flex", gap: 6 } },
+				h(ThemeToggle, { ctx }),
+				h(Btn, { size: "sm", onClick: load }, t("action.refresh")))),
+		error ? h("div", { className: "dmi-error" }, error) : null,
+		view === null && error === "" ? h("div", { className: "dmi-empty" }, "…") : h("div", { style: { display: "flex", flexDirection: "column", gap: 12 } },
+			h("div", { className: "dmi-card" },
+				h("div", { className: "dmi-card-title" }, who),
+				h("div", { className: "dmi-kv" },
+					id.gender ? h("span", null, id.gender) : null,
+					id.birthplace ? h("span", null, id.birthplace) : null,
+					id.origin ? h("span", null, t("f.origin") + "：" + id.origin) : null),
+				h("div", { className: "dmi-muted", style: { fontSize: 11 } }, t("dock.identity"))),
+			h("div", { className: "dmi-stats" },
+				cny ? [
+					h("div", { key: "g", className: "dmi-stat dmi-stat--hero" }, h("span", null, t("stat.grand")), h("b", null, fmtMoney(cny.grand))),
+					h("div", { key: "b", className: "dmi-stat" }, h("span", null, t("stat.bank")), h("b", null, fmtMoney(cny.bank))),
+					h("div", { key: "p", className: "dmi-stat" }, h("span", null, t("stat.pay")), h("b", null, fmtMoney(cny.pay))),
+					h("div", { key: "s", className: "dmi-stat" }, h("span", null, t("stat.stock")), h("b", null, fmtMoney(cny.stock))),
+					h("div", { key: "h", className: "dmi-stat" }, h("span", null, t("stat.holdings")), h("b", null, fmtMoney(cny.holdings))),
+				] : h("div", { className: "dmi-empty" }, t("ov.empty")),
+				h(Btn, { size: "sm", variant: "primary", onClick: () => { try { const l = (typeof ctx.get === "function" ? ctx.get("layout") : undefined) || ctx.layout; if (l && l.selectPanel) l.selectPanel("myinfo"); } catch (e) {} } }, t("ov.open"))),
+			(assets.holdings || []).length > 0 ? h("div", { className: "dmi-card" },
+				h("div", { className: "dmi-card-title" }, t("holdings.of") + " · " + assets.holdings.length),
+				h("div", { className: "dmi-kv" }, assets.holdings.slice(0, 5).map((x) =>
+					h("span", { key: x.id }, x.code + (x.name ? " " + x.name : "") + " × " + x.shares)))) : null));
 }
 
 // ---------------------------------------------------------------------------
@@ -929,6 +1044,30 @@ function apply(ctx) {
 		name: "shell.overlay",
 		id: "dsh-myinfo-overlay",
 	}, (props) => AssetOverlay(props, ctx)));
+	// 右侧停靠面板：sidebarRightTabs 服务存在才注册（headless profile 缺服务时跳过）。
+	const tabsService = (typeof ctx.get === "function" ? ctx.get("sidebarRightTabs") : undefined) || ctx.sidebarRightTabs;
+	if (tabsService && typeof tabsService.register === "function") {
+		ctx.effect(() => tabsService.register({
+			id: DOCK_ID,
+			kind: DOCK_KIND,
+			priority: "extension",
+			title: () => t("dock.title"),
+			guide: [{
+				id: "myinfo-guide",
+				order: 10,
+				title: () => t("dock.title"),
+				description: () => t("subtitle"),
+			}],
+		}));
+		ctx.slots.inject("sidebar.right.pane.tab", () => ctx.slots.register({
+			name: "sidebar.right.pane.tab",
+			key: DOCK_ID,
+		}, (props) => MyInfoDock(props, ctx)));
+		ctx.slots.inject("sidebar.right.pane.tab.title", () => ctx.slots.register({
+			name: "sidebar.right.pane.tab.title",
+			key: DOCK_ID,
+		}, () => h("span", null, t("dock.title"))));
+	}
 }
 
 const inject = ["slots", "locale"];

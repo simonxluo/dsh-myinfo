@@ -1,6 +1,6 @@
 # dsh-myinfo 设计文档（控制流 / 数据流 / 模块）
 
-> 前置：数据建模见 `docs/requirements.md`（先建模，后设计）。版本 v0.3.0（含 workflow 评审修复 + Apple 风格主面板/浮窗）。
+> 前置：数据建模见 `docs/requirements.md`（先建模，后设计）。版本 v0.4.0（workflow 修复 + Apple 风格主面板/浮窗/右栏停靠 + 手动深浅外观）。
 
 ## 1. 模块划分
 

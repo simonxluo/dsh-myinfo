@@ -13,6 +13,8 @@
 - **agent 工具**：`personal_identity` / `personal_career` / `personal_relations` / `personal_reflections` / `personal_assets`，聊天里直接记录与查询；
 - **主面板**（Apple 风格）：侧栏「个人档案」图标 → 整页档案（hero 头 + 分段控件五域）；
 - **资产速览浮窗**：右下角毛玻璃胶囊显示总资产，点开速览卡、一键跳主面板，每分钟自动刷新；
+- **右侧停靠面板**：会话右栏的档案摘要卡（主面板点「在右侧停靠」或从右栏引导页打开）；
+- **深色手动开关**：主面板/设置页/浮窗卡上的 ☀️/🌙，手动优先、清除即恢复跟随宿主/系统；
 - **设置面板**：DSH 设置 → 「个人信息」，与主面板共用的五域表单。
 
 设计文档见 [docs/requirements.md](docs/requirements.md)（需求与数据建模）与 [docs/design.md](docs/design.md)（控制流/数据流/模块），并经多模型 workflow 交叉评审（[docs/workflow-report.md](docs/workflow-report.md)）。

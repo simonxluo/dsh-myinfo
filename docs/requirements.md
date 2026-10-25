@@ -1,6 +1,6 @@
 # dsh-myinfo 需求文档（含数据建模与功能表单）
 
-> 版本：v0.3.0 · 状态：已实现并通过单元测试（含多模型 workflow 评审回归项）；评审记录见 `docs/workflow-report.md`
+> 版本：v0.4.0 · 状态：已实现并通过单元测试（含多模型 workflow 评审回归项）；评审记录见 `docs/workflow-report.md`
 
 ## 1. 需求分析
 
@@ -187,8 +187,10 @@ assets.accounts (N) ─┬─ kind ∈ {bank, pay, stock}
 |------|--------|------|
 | 中央主面板「个人档案」 | `sidebar.panellist`（图标）+ `main`（keyed，id=`myinfo`） | 整页档案：hero 头（姓名/年龄/现居地/总资产）+ 五段分段控件 + 五域内容（与设置页共用组件与表单） |
 | 资产速览浮窗 | `shell.overlay` | 右下角胶囊显示总资产；点击展开毛玻璃速览卡（四类资产 + 更新时间），一键跳转主面板；每 60s 静默刷新 |
+| 右侧停靠面板 | `sidebarRightTabs.register`（id=`dsh-myinfo-dock`，kind=`myinfo.profile`）+ `sidebar.right.pane.tab[.title]` | 会话右栏的窄列档案摘要（基本资料卡 + 资产统计 + 持仓前 5），从引导页或主面板「在右侧停靠」打开 |
+| 深色手动开关 | localStorage（`dsh-myinfo.theme`） | 主面板/设置页/浮窗卡三处 ☀️/🌙 按钮；手动值优先于宿主主题与系统偏好，清除即恢复自动 |
 
-视觉语言：SF 字体栈、毛玻璃材质（backdrop blur + saturate）、hairline 分隔、iOS 分段控件、系统色板（#007AFF/#FF3B30/#34C759），明暗主题跟随宿主/系统。
+视觉语言：SF 字体栈、毛玻璃材质（backdrop blur + saturate）、hairline 分隔、iOS 分段控件、系统色板（#007AFF/#FF3B30/#34C759），明暗主题 = 手动开关 > 宿主主题 > 系统偏好。
 
 ### 3.3 记录时机（给 agent 的使用约定）
 
