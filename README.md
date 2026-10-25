@@ -43,6 +43,7 @@ Everything reads and writes the same local file (`$DSH_HOME/integrations/dsh-myi
 
 - **Agent tools** — `personal_identity` / `personal_career` / `personal_relations` / `personal_reflections` / `personal_assets`; record and query straight from chat
 - **`personal_context`** — one call returns the whole personal-context digest (identity, current job, key relations, latest reflection, asset totals with top holdings), so the agent picks up your background in real time during a conversation
+- **`personal_search`** — fuzzy keyword search across all six domains (identity / career / relations / reflections / accounts / holdings); case-insensitive substring match, space-separated keywords are AND-ed, hits return ids, matched fields and snippets — recall anyone, any company, any stock code, any tag from a single keyword
 - **Main panel** (Apple aesthetic, card dashboard) — the sidebar Profile icon opens a card grid: each domain is a card with its summary up front; click a card to dive into the full detail page (back capsule to return)
 - **Asset overlay** — a frosted pill in the bottom-right corner shows your net total; click it for a quick card and a one-tap jump to the panel; refreshes itself every minute
 - **Right dock** — a compact profile digest docked into the session's right pane (「Dock to right」 on the main panel, or the dock's guide page)

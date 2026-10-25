@@ -1,9 +1,9 @@
 /**
  * dsh-myinfo — Cordis 插件入口。
  *
- * apply 做两件事：注册 6 个 agent 工具（personal_identity / personal_career /
+ * apply 做两件事：注册 7 个 agent 工具（personal_identity / personal_career /
  * personal_relations / personal_reflections / personal_assets + 一次性摘要
- * personal_context），并在
+ * personal_context + 跨档案模糊搜索 personal_search），并在
  * webServer 可用时挂载设置页面板路由（/_dsh/dsh-myinfo/panel）。
  * 数据落在 $DSH_HOME/integrations/dsh-myinfo/data.json（0600）。
  */

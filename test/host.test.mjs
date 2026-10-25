@@ -146,6 +146,35 @@ if (!digestText.includes('张三') || !digestText.includes('R公司') || !digest
 	throw new Error('personal_context render should mention identity, current job and the title');
 }
 
+// --- v0.7.0 personal_search：跨档案模糊搜索 ---
+const search = byName.get('personal_search');
+const sName = await search.execute({ query: '张三' });
+equal(sName.total, 1, 'identity hit by name');
+equal(sName.counts.identity, 1);
+equal(sName.results[0].matchedFields.includes('姓名'), true, 'matched field carries Chinese label');
+const sStock = await search.execute({ query: '平安' });
+equal(sStock.counts.holdings, 1, 'holding hit by stock name');
+equal(sStock.results[0].id.startsWith('h'), true, 'holding id carried for follow-up calls');
+const sCase = await search.execute({ query: 'w3' });
+equal(sCase.counts.career, 1, 'case-insensitive company match');
+const sAnd = await search.execute({ query: '李四 校友' });
+equal(sAnd.total, 1, 'multi-term AND matches the relation');
+equal(sAnd.results[0].entry.name, '李四', 'entry payload returned with the hit');
+const sAndMiss = await search.execute({ query: '李四 不存在的词' });
+equal(sAndMiss.total, 0, 'AND semantics: one missing term misses');
+const sScoped = await search.execute({ query: '银行', categories: ['holdings'] });
+equal(sScoped.counts.holdings, 1, 'scoped search finds the holding');
+equal(sScoped.counts.accounts, 0, 'category filter excludes 招商银行');
+const sAll = await search.execute({ query: '银行' });
+// 招商银行命中名称；脏读测试塞入的 a99「手改」是 bank 类型，类型标签「银行卡」同样含关键词——按类型也应可搜到。
+equal(sAll.counts.accounts, 2, 'unscoped search finds both bank-kind accounts (name + kind-label matches)');
+await rejects(() => search.execute({ query: '   ' }), /不能为空/);
+await rejects(() => search.execute({ query: 'x', categories: ['nope'] }), /categories/);
+const sText = (await search.output.render)({}, sName).map((x) => x.text).join('\n');
+if (!sText.includes('张三') || !sText.includes('个人档案搜索')) {
+	throw new Error('personal_search render should mention the query keyword and title');
+}
+
 // --- v0.4.x 主题修复回归：parseColorLuminance + autoDark 关键结构 ---
 import { readFileSync as _rf } from 'node:fs';
 const clientSrc = _rf(new URL('../client.js', import.meta.url), 'utf8');

@@ -1,7 +1,8 @@
 /**
  * dsh-myinfo — agent 工具：personal_identity / personal_career /
  * personal_relations / personal_reflections / personal_assets，外加一次性
- * 摘要工具 personal_context（对话中实时拉取用户个人上下文）。
+ * 摘要工具 personal_context（对话中实时拉取用户个人上下文）与跨档案模糊
+ * 搜索 personal_search（一个关键词查六类数据）。
  *
  * 工具是档案的唯一写入方之一（另一方是设置页面板）；两者共用 store.js
  * 的校验与 mutate 事务。list/get 返回结构化 JSON，render 同时给出可读
@@ -230,6 +231,209 @@ function renderContext(digest) {
 		}
 	}
 	lines.push('\n（各类完整明细可用 personal_identity / personal_career / personal_relations / personal_reflections / personal_assets 查询与更新。）');
+	return lines.join('\n');
+}
+
+// ---------------------------------------------------------------------------
+// 跨档案模糊搜索（personal_search）：一个关键词查全部分类
+// ---------------------------------------------------------------------------
+
+const CATEGORY_LABELS = {
+	identity: '基本信息', career: '工作经历', relations: '周围的人',
+	reflections: '人生感悟', accounts: '资产账户', holdings: '持仓',
+};
+
+const ACCOUNT_KIND_LABELS = { bank: '银行卡', pay: '支付软件', stock: '股票账户' };
+
+const IDENTITY_FIELDS = [
+	['name', '姓名'], ['gender', '性别'], ['birthDate', '出生日期'], ['birthplace', '出生地'],
+	['origin', '归属地'], ['residence', '现居地'], ['phone', '电话'], ['email', '邮箱'], ['notes', '备注'],
+];
+
+/** 把档案视图摊平成可搜索单元：每条含类别、标题、副标题与可命中字段（键 / 中文标签 / 文本值）。 */
+function searchableRecords(view) {
+	const keep = (fields) => fields.filter(([, , value]) => String(value ?? '') !== '');
+	const records = [];
+	const identity = view.identity ?? {};
+	const idFields = keep(IDENTITY_FIELDS.map(([key, label]) => [key, label, identity[key]]));
+	if (idFields.length > 0) {
+		records.push({ category: 'identity', id: '', title: '基本信息', subtitle: '', fields: idFields, entry: null });
+	}
+	for (const entry of view.career ?? []) {
+		records.push({
+			category: 'career',
+			id: entry.id,
+			title: [entry.company, entry.title].filter(Boolean).join(' · '),
+			subtitle: entry.current ? '在职' : periodOf(entry),
+			fields: keep([
+				['company', '公司', entry.company], ['title', '职位', entry.title], ['location', '地点', entry.location],
+				['startDate', '开始时间', entry.startDate], ['endDate', '结束时间', entry.endDate],
+				['content', '工作内容', entry.content], ['salaryNotes', '薪资备注', entry.salary?.notes],
+			]),
+			entry,
+		});
+	}
+	for (const entry of view.relations ?? []) {
+		records.push({
+			category: 'relations',
+			id: entry.id,
+			title: entry.name,
+			subtitle: entry.relation,
+			fields: keep([
+				['name', '姓名', entry.name], ['relation', '关系', entry.relation], ['group', '分组', entry.group],
+				['contact', '联系方式', entry.contact], ['notes', '备注', entry.notes],
+				['tags', '标签', (entry.tags ?? []).join(' ')],
+			]),
+			entry,
+		});
+	}
+	for (const entry of view.reflections ?? []) {
+		records.push({
+			category: 'reflections',
+			id: entry.id,
+			title: entry.title || entry.date,
+			subtitle: entry.date,
+			fields: keep([
+				['date', '日期', entry.date], ['title', '标题', entry.title],
+				['content', '正文', entry.content], ['tags', '标签', (entry.tags ?? []).join(' ')],
+			]),
+			entry,
+		});
+	}
+	const accountName = new Map((view.assets?.accounts ?? []).map((x) => [x.id, x.name]));
+	for (const entry of view.assets?.accounts ?? []) {
+		records.push({
+			category: 'accounts',
+			id: entry.id,
+			title: entry.name,
+			subtitle: ACCOUNT_KIND_LABELS[entry.kind] ?? entry.kind,
+			fields: keep([
+				['name', '名称', entry.name], ['kind', '类型', ACCOUNT_KIND_LABELS[entry.kind] ?? entry.kind],
+				['mask', '标识', entry.mask], ['currency', '币种', entry.currency], ['notes', '备注', entry.notes],
+			]),
+			entry,
+		});
+	}
+	for (const entry of view.assets?.holdings ?? []) {
+		const owner = accountName.get(entry.account) ?? entry.account;
+		records.push({
+			category: 'holdings',
+			id: entry.id,
+			title: `${entry.code}${entry.name ? ' ' + entry.name : ''}`,
+			subtitle: owner,
+			fields: keep([
+				['account', '归属账户', owner], ['code', '代码', entry.code], ['name', '名称', entry.name],
+				['market', '市场', entry.market], ['notes', '备注', entry.notes],
+			]),
+			entry,
+		});
+	}
+	return records;
+}
+
+/** 多关键词 AND 匹配：全部关键词都命中（大小写不敏感包含）才算该条命中，返回命中字段的中文标签。 */
+function matchRecord(record, terms) {
+	const matched = new Map();
+	for (const term of terms) {
+		let hit = false;
+		for (const [key, label, value] of record.fields) {
+			if (String(value).toLowerCase().includes(term)) {
+				matched.set(key, label);
+				hit = true;
+			}
+		}
+		if (!hit) return null;
+	}
+	return [...matched.values()];
+}
+
+/** 长文本里截取首个命中附近的窗口做摘要；未命中返回 null。 */
+function snippetAround(text, term, radius = 40) {
+	const s = String(text);
+	const index = s.toLowerCase().indexOf(term);
+	if (index < 0) return null;
+	const start = Math.max(0, index - radius);
+	const end = Math.min(s.length, index + term.length + radius);
+	return (start > 0 ? '…' : '') + s.slice(start, end).replace(/\s+/g, ' ') + (end < s.length ? '…' : '');
+}
+
+/** 搜索结果里的条目副本：超长正文字段换成命中窗口摘要，避免一次搜索输出整篇感悟。 */
+function excerptEntry(entry, terms) {
+	if (entry === null || entry === undefined) return null;
+	const out = { ...entry };
+	for (const key of ['content', 'notes']) {
+		const value = out[key];
+		if (typeof value !== 'string' || value.length <= 400) continue;
+		const parts = [];
+		for (const term of terms) {
+			const s = snippetAround(value, term, 60);
+			if (s !== null && !parts.includes(s)) parts.push(s);
+		}
+		if (parts.length > 0) out[key] = parts.join(' …… ') + `（原文 ${value.length} 字，完整内容用对应 list 工具查看）`;
+	}
+	return out;
+}
+
+/** 搜索主逻辑：query 空格分词（AND），categories 可限定类别；返回按类别分组的命中与计数。 */
+function searchProfile(profile, query, categories) {
+	const terms = [...new Set(String(query ?? '').toLowerCase().split(/\s+/).filter((x) => x !== ''))];
+	if (terms.length === 0) throw new StoreError('query 不能为空');
+	let wanted = null;
+	if (categories !== null && categories !== undefined) {
+		wanted = new Set(categories.filter((x) => CATEGORY_LABELS[x] !== undefined));
+		if (wanted.size === 0) throw new StoreError(`categories 需是 ${Object.keys(CATEGORY_LABELS).join(' / ')} 的子集`);
+	}
+	const view = profileView(profile);
+	const results = [];
+	for (const record of searchableRecords(view)) {
+		if (wanted !== null && !wanted.has(record.category)) continue;
+		const matchedFields = matchRecord(record, terms);
+		if (matchedFields === null) continue;
+		let snippet = null;
+		for (const [key, , value] of record.fields) {
+			if (key !== 'content' && key !== 'notes') continue;
+			for (const term of terms) {
+				snippet = snippetAround(value, term);
+				if (snippet !== null) break;
+			}
+			if (snippet !== null) break;
+		}
+		results.push({
+			category: record.category,
+			categoryLabel: CATEGORY_LABELS[record.category],
+			id: record.id,
+			title: record.title,
+			subtitle: record.subtitle,
+			matchedFields,
+			snippet,
+			entry: excerptEntry(record.entry, terms),
+		});
+	}
+	const counts = {};
+	for (const key of Object.keys(CATEGORY_LABELS)) counts[key] = 0;
+	for (const r of results) counts[r.category] += 1;
+	return { query: String(query), terms, total: results.length, counts, results };
+}
+
+function renderSearch(output) {
+	const lines = [`### 个人档案搜索：“${output.query}”`];
+	if (output.total === 0) {
+		lines.push('没有命中。可换关键词重试；总览用 personal_context，分类明细用 personal_identity / personal_career / personal_relations / personal_reflections / personal_assets。');
+		return lines.join('\n');
+	}
+	const parts = Object.entries(output.counts).filter(([, n]) => n > 0).map(([k, n]) => `${CATEGORY_LABELS[k]} ${n}`).join(' · ');
+	lines.push(`命中 **${output.total}** 条（${parts}）`);
+	let category = '';
+	for (const r of output.results) {
+		if (r.category !== category) {
+			category = r.category;
+			lines.push(`\n**${r.categoryLabel}**`);
+		}
+		const idPart = r.id ? `（id: ${r.id}）` : '';
+		const sub = r.subtitle ? ` — ${r.subtitle}` : '';
+		lines.push(`- **${r.title}**${sub}${idPart} ← 命中 [${r.matchedFields.join('、')}]`);
+		if (r.snippet !== null) lines.push(`  ${r.snippet}`);
+	}
 	return lines.join('\n');
 }
 
@@ -496,6 +700,32 @@ export function buildTools() {
 			output: { schema: OBJ_SCHEMA, render: (_a, v) => block(renderContext(v)) },
 			async execute() {
 				return contextDigest(loadProfile());
+			},
+		},
+		{
+			name: 'personal_search',
+			description:
+				'跨个人档案模糊搜索：一个关键词同时查六类数据——基本信息/工作经历/周围的人/人生感悟/资产账户/持仓' +
+				'（大小写不敏感的包含匹配；多个关键词用空格分隔，需全部命中）。返回命中条目的 id、标题、命中字段与摘要。' +
+				'按人名、公司、股票代码、标签、感悟内容等任何线索回忆信息时用本工具；' +
+				'总览用 personal_context，查看某类完整数据用 personal_identity / personal_career / personal_relations / personal_reflections / personal_assets。',
+			parameters: {
+				type: 'object',
+				properties: {
+					query: { type: 'string', description: '关键词，如 "杨锴"、"腾讯"、"600519"、"炒股"；多个关键词空格分隔（AND 语义）' },
+					categories: {
+						type: 'array',
+						items: { type: 'string', enum: Object.keys(CATEGORY_LABELS) },
+						description: '限定搜索类别（可选，缺省查全部）：identity/career/relations/reflections/accounts/holdings',
+					},
+				},
+				required: ['query'],
+				additionalProperties: false,
+			},
+			output: { schema: OBJ_SCHEMA, render: (_a, v) => block(renderSearch(v)) },
+			async execute(rawArgs) {
+				const args = rawArgs || {};
+				return searchProfile(loadProfile(), str(args, 'query'), Array.isArray(args.categories) ? args.categories : null);
 			},
 		},
 	];
