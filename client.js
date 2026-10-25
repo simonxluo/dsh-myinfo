@@ -21,12 +21,20 @@ function localeToLang(active) {
 	return "zh";
 }
 var relocalize = null;
-function localeServiceOf(ctx) {
+/**
+ * 读取「可选」服务：只走 ctx.get(name)。
+ * cordis 的属性访问会强制要求该服务写进 inject 列表，否则抛
+ * `cannot get property "..." without inject`；但可选服务不能写进 inject
+ * （写进去就成了必需，缺失时整个 client 入口会 pending），所以一律不读属性。
+ */
+function serviceOf(ctx, name) {
 	try {
-		if (typeof ctx.get === "function") return ctx.get("locale");
-		if (ctx.locale) return ctx.locale;
-	} catch (e) { /* 无 locale 服务则维持默认 */ }
+		return typeof ctx.get === "function" ? ctx.get(name) : undefined;
+	} catch (e) { /* 服务不可用则按缺失处理 */ }
 	return undefined;
+}
+function localeServiceOf(ctx) {
+	return serviceOf(ctx, "locale");
 }
 function subscribeLocale(ctx) {
 	const service = localeServiceOf(ctx);
@@ -959,7 +967,7 @@ function MyInfoPanel(props, ctx) {
 				h("div", { className: "dmi-page-sub" }, who || t("subtitle"))),
 			h(Btn, { size: "sm", onClick: () => {
 				try {
-					const r = (typeof ctx.get === "function" ? ctx.get("sidebarRight") : undefined) || ctx.sidebarRight;
+					const r = serviceOf(ctx, "sidebarRight");
 					if (r && typeof r.openTab === "function") r.openTab(DOCK_KIND, { params: {} });
 				} catch (e) { /* 右栏服务不可用则忽略 */ }
 			} }, t("dock.dock")),
@@ -991,7 +999,7 @@ function AssetOverlay(props, ctx) {
 	const dark = darkClassOf(ctx);
 	const openPanel = () => {
 		try {
-			const layout = (typeof ctx.get === "function" ? ctx.get("layout") : undefined) || ctx.layout;
+			const layout = serviceOf(ctx, "layout");
 			if (layout && typeof layout.selectPanel === "function") layout.selectPanel("myinfo");
 		} catch (e) { /* 布局服务不可用则忽略 */ }
 	};
@@ -1075,7 +1083,7 @@ function MyInfoDock(props, ctx) {
 				h("div", { key: "h", className: "dmi-stat" }, h("span", null, t("stat.holdings")), h("b", null, fmtMoney(cny.holdings))))
 				: h("div", { className: "dmi-empty" }, t("ov.empty")),
 			h("div", { className: "dmi-actions" },
-				h(Btn, { size: "sm", variant: "primary", onClick: () => { try { const l = (typeof ctx.get === "function" ? ctx.get("layout") : undefined) || ctx.layout; if (l && l.selectPanel) l.selectPanel("myinfo"); } catch (e) {} } }, t("ov.open"))),
+				h(Btn, { size: "sm", variant: "primary", onClick: () => { try { const l = serviceOf(ctx, "layout"); if (l && l.selectPanel) l.selectPanel("myinfo"); } catch (e) {} } }, t("ov.open"))),
 			(assets.holdings || []).length > 0 ? h("div", { className: "dmi-card" },
 				h("div", { className: "dmi-card-title" }, t("holdings.of") + " · " + assets.holdings.length),
 				h("div", { className: "dmi-kv" }, assets.holdings.slice(0, 5).map((x) =>
@@ -1111,10 +1119,14 @@ function apply(ctx) {
 		name: "shell.overlay",
 		id: "dsh-myinfo-overlay",
 	}, (props) => AssetOverlay(props, ctx)));
-	// 右侧停靠面板：sidebarRightTabs 服务存在才注册（headless profile 缺服务时跳过）。
-	const tabsService = (typeof ctx.get === "function" ? ctx.get("sidebarRightTabs") : undefined) || ctx.sidebarRightTabs;
-	if (tabsService && typeof tabsService.register === "function") {
-		ctx.effect(() => tabsService.register({
+	// 右侧停靠面板：sidebarRightTabs 是「可选」服务（headless 等组合里没有）。
+	// 必须用 ctx.inject 等它出现，不能读 ctx.sidebarRightTabs：cordis 的属性访问
+	// 要求服务写进 inject 列表，否则抛 `cannot get property "sidebarRightTabs"
+	// without inject`，整个 client 入口直接变 failed（web boot 启动失败）。
+	ctx.inject(["sidebarRightTabs"], (dock) => {
+		const tabsService = serviceOf(dock, "sidebarRightTabs");
+		if (tabsService === undefined || typeof tabsService.register !== "function") return;
+		dock.effect(() => tabsService.register({
 			id: DOCK_ID,
 			kind: DOCK_KIND,
 			priority: "extension",
@@ -1125,16 +1137,16 @@ function apply(ctx) {
 				title: () => t("dock.title"),
 				description: () => t("subtitle"),
 			}],
-		}));
-		ctx.slots.inject("sidebar.right.pane.tab", () => ctx.slots.register({
+		}), "dsh-myinfo: dock tab type");
+		dock.slots.inject("sidebar.right.pane.tab", () => dock.slots.register({
 			name: "sidebar.right.pane.tab",
 			key: DOCK_ID,
 		}, (props) => MyInfoDock(props, ctx)));
-		ctx.slots.inject("sidebar.right.pane.tab.title", () => ctx.slots.register({
+		dock.slots.inject("sidebar.right.pane.tab.title", () => dock.slots.register({
 			name: "sidebar.right.pane.tab.title",
 			key: DOCK_ID,
 		}, () => h("span", null, t("dock.title"))));
-	}
+	});
 }
 
 const inject = ["slots", "locale"];
