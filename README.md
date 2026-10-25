@@ -1,35 +1,78 @@
+<div align="center">
+
+<img src="icon.svg" width="108" alt="dsh-myinfo"/>
+
 # dsh-myinfo
 
-[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 个人信息管理插件：把「我是谁、我做过什么、我身边有谁、我想通了什么、我有多少资产」沉淀成一份本机档案。
+**A local-first personal dossier for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) — who I am, what I've done, who's around me, what I've figured out, and what I own.**
 
-- **基本信息**：姓名 / 性别 / 出生日期（自动算年龄）/ 出生地 / 归属地 / 现居地
-- **工作经历**：公司、职位、时间、内容、薪资（当前在职自动标记）
-- **人际关系**：周围的人与和我的关系，分组 / 标签
-- **人生感悟**：按日期归档的时间线
-- **资产台账**：银行卡、支付宝、微信余额；股票账户余额与持仓（如同花顺 A 股持仓），按币种自动汇总
+[![version](https://img.shields.io/badge/version-0.5.0-0071e3)](https://github.com/simonxluo/dsh-myinfo/releases)
+[![License: MIT](https://img.shields.io/badge/license-MIT-34c759)](https://github.com/simonxluo/dsh-myinfo/blob/main/LICENSE)
+[![DeepSeek Harness](https://img.shields.io/badge/DeepSeek_Harness-%E2%89%A5_0.2.1--rc.1-8957e5)](https://github.com/deepseek-ai/deepseek-harness)
+[![platform](https://img.shields.io/badge/platform-Web_%7C_Desktop-8E8E93)](https://github.com/simonxluo/dsh-myinfo)
 
-三个界面入口 + agent 工具共用同一份数据（`$DSH_HOME/integrations/dsh-myinfo/data.json`，权限 0600，绝不离开本机）：
+🇬🇧 **English** · 🇨🇳 [简体中文](docs/README.zh.md) · 🇯🇵 [日本語](docs/README.ja.md) · 🇪🇸 [Español](docs/README.es.md)
 
-- **agent 工具**：`personal_identity` / `personal_career` / `personal_relations` / `personal_reflections` / `personal_assets`，聊天里直接记录与查询；
-- **主面板**（Apple 风格）：侧栏「个人档案」图标 → 整页档案（hero 头 + 分段控件五域）；
-- **资产速览浮窗**：右下角毛玻璃胶囊显示总资产，点开速览卡、一键跳主面板，每分钟自动刷新；
-- **右侧停靠面板**：会话右栏的档案摘要卡（主面板点「在右侧停靠」或从右栏引导页打开）；
-- **深色手动开关**：主面板/设置页/浮窗卡上的 ☀️/🌙，手动优先、清除即恢复跟随宿主/系统；
-- **设置面板**：DSH 设置 → 「个人信息」，与主面板共用的五域表单。
+</div>
 
-设计文档见 [docs/requirements.md](docs/requirements.md)（需求与数据建模）与 [docs/design.md](docs/design.md)（控制流/数据流/模块），并经多模型 workflow 交叉评审（[docs/workflow-report.md](docs/workflow-report.md)）。
+---
 
-## 安装
+## Contents
+
+- [Features](#features)
+- [One data source, five surfaces](#one-data-source-five-surfaces)
+- [Install](#install)
+- [Privacy](#privacy)
+- [Documentation](#documentation)
+- [Development](#development)
+- [License](#license)
+
+---
+
+## Features
+
+- **Identity** — name / gender / birth date (age computed automatically) / birthplace / origin / residence
+- **Career** — company, title, period, work content, salary (current job auto-badged)
+- **Relationships** — people around you and their relation to you, with groups and tags
+- **Reflections** — life notes archived on a dated timeline
+- **Assets** — bank cards, Alipay / WeChat balances, stock-account cash and holdings (e.g. THS A-share positions), totaled per currency
+
+## One data source, five surfaces
+
+Everything reads and writes the same local file (`$DSH_HOME/integrations/dsh-myinfo/data.json`, mode 0600 — it never leaves your machine):
+
+- **Agent tools** — `personal_identity` / `personal_career` / `personal_relations` / `personal_reflections` / `personal_assets`; record and query straight from chat
+- **Main panel** (Apple aesthetic) — the sidebar Profile icon opens a full-page dossier with a hero header and a segmented control across the five domains
+- **Asset overlay** — a frosted pill in the bottom-right corner shows your net total; click it for a quick card and a one-tap jump to the panel; refreshes itself every minute
+- **Right dock** — a compact profile digest docked into the session's right pane (「Dock to right」 on the main panel, or the dock's guide page)
+- **Settings section** — DSH settings → Personal Info, sharing the same five-domain forms
+- **Appearance** — the 🌗 → ☀️ → 🌙 three-state switch (follow app → light → dark) on every surface; manual states override the host theme with literal tokens and really take effect, and the third click returns to follow-app
+
+## Install
 
 ```sh
-# 网页端 / 桌面端插件页添加包名：
+# add by package name on the web / desktop plugin page:
 dsh-myinfo
-# 或命令行：
+# or from the CLI:
 dsh plugin --profile web add dsh-myinfo
 ```
 
-本地开发：`npm test`（Host 端单元测试，使用临时目录，不触碰真实档案）。
+## Privacy
 
-## 隐私
+The repository itself ships **no personal data**; runtime data lives only under `$DSH_HOME`, and local files excluded by `.gitignore` never enter version control.
 
-仓库本身**不含任何个人数据**；运行期数据只写入 `$DSH_HOME`，已被 `.gitignore` 排除的本地文件也不会进入版本库。
+## Documentation
+
+- [Requirements & data modeling](docs/requirements.md)
+- [Control-flow / data-flow design](docs/design.md)
+- [Multi-model workflow review reports](docs/workflow-report.md)
+
+## Development
+
+```sh
+npm test   # host-side unit tests against a temp dir; never touches your real dossier
+```
+
+## License
+
+[MIT](LICENSE)
