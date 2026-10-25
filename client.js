@@ -340,6 +340,14 @@ const STYLE_CSS = ""
 + ".dmi-detail-title{font-size:27px;font-weight:750;letter-spacing:-.7px;flex:1;min-width:0;margin:0}"
 + ".dmi-detail-body{animation:dmi-detail-in .3s cubic-bezier(.25,.1,.25,1)}"
 + "@keyframes dmi-detail-in{from{opacity:0;transform:translateX(26px)}to{opacity:1;transform:none}}";
+// —— 右栏停靠：摘要块可点击 + 快捷域导航 ——
++ ".dmi-dockopen{cursor:pointer;text-align:left;font:inherit;color:inherit;width:100%;padding-left:0;padding-right:0;transition:transform .15s,opacity .15s;background:transparent}"
++ ".dmi-card.dmi-dockopen{background:var(--dmi-bg-elev)}"
++ ".dmi-dockopen:hover{opacity:.85}"
++ ".dmi-dockopen:active{transform:scale(.985)}"
++ ".dmi-docknav{display:flex;gap:6px;flex-wrap:wrap}"
++ ".dmi-docknav-btn{border:none;background:var(--dmi-fill);color:var(--dmi-text-2);font:inherit;font-size:12px;font-weight:600;padding:5px 12px;border-radius:999px;cursor:pointer;transition:background .18s,color .18s}"
++ ".dmi-docknav-btn:hover{background:var(--dmi-fill-2);color:var(--dmi-text)}";
 
 
 /** 作用域主题类：手动覆盖 → force-*（字面量直出，真实宿主里也真实生效）；
@@ -1165,6 +1173,16 @@ function AssetOverlay(props, ctx) {
 	const { view, busy, load } = useMyInfoData();
 	useThemeTick();
 	const [expanded, setExpanded] = useState(false);
+	// 右栏停靠面板打开时浮窗整体隐藏：胶囊/速览卡是 viewport 级 fixed 定位，
+	// 会压在右栏内容上，右栏里的点击会落到「打开完整档案」上、误跳主面板。
+	// 宿主在 dock 根节点维护 [data-sidebar-right-open] 状态属性，轮询它是最稳判据。
+	const [dockOpen, setDockOpen] = useState(false);
+	useEffect(() => {
+		const check = () => setDockOpen(document.querySelector('[data-sidebar-right-open]') !== null);
+		check();
+		const timer = window.setInterval(check, 400);
+		return () => { window.clearInterval(timer); };
+	}, []);
 	useEffect(() => { load(); }, [load]);
 	// 每分钟静默刷新一次（浮窗常驻，最新余额很重要）
 	useEffect(() => {
@@ -1183,6 +1201,7 @@ function AssetOverlay(props, ctx) {
 			if (layout && typeof layout.selectPanel === "function") layout.selectPanel("myinfo");
 		} catch (e) { /* 布局服务不可用则忽略 */ }
 	};
+	if (dockOpen) return null;
 	if (!expanded) {
 		return h("div", { className: "dmi-scope dmi-ov" + themeClass },
 			h("div", {
@@ -1225,10 +1244,11 @@ function AssetOverlay(props, ctx) {
 const DOCK_ID = "dsh-myinfo-dock";   // definition.id = body/title 注册 key
 const DOCK_KIND = "myinfo.profile";  // openTab 的 kind
 
-/** 窄列档案摘要：基本资料 + 资产速览 + 跳转完整档案。 */
+/** 窄列档案：摘要可点击、栏内直接展开域详情（不跳主面板）；「打开完整档案」仍可一键跳转。 */
 function MyInfoDock(props, ctx) {
-	const { view, error, busy, load } = useMyInfoData();
+	const { view, error, busy, load, post } = useMyInfoData();
 	const [, tick] = useState(0);
+	const [page, setPage] = useState(null); // null = 摘要；TAB_KEYS 值 = 栏内展开的域详情
 	useThemeTick();
 	useEffect(() => {
 		relocalize = () => tick((v) => v + 1);
@@ -1239,34 +1259,51 @@ function MyInfoDock(props, ctx) {
 	const assets = (view && view.assets) || { accounts: [], holdings: [], totals: { totals: {} } };
 	const cny = ((assets.totals && assets.totals.totals) || {}).CNY || null;
 	const who = [id.name || "—", id.age !== null && id.age !== undefined ? id.age + " 岁" : "", id.residence].filter(Boolean).join(" · ");
+	const inDetail = page !== null && TAB_KEYS.indexOf(page) >= 0;
+	const openFull = () => { try { const l = serviceOf(ctx, "layout"); if (l && l.selectPanel) l.selectPanel("myinfo"); } catch (e) {} };
 	ensureStyle();
 	return h("div", { className: "dmi-scope dmi-dockpage" + scopeClassOf(ctx), style: { padding: "16px 14px", display: "flex", flexDirection: "column", gap: 12, minHeight: "100%" } },
 		h("div", { className: "dmi-head" },
-			h("h3", { style: { margin: 0, fontSize: 16 } }, t("dock.title")),
+			inDetail
+				? h("button", { type: "button", className: "dmi-back", onClick: () => setPage(null), "aria-label": t("panel.title") },
+					h("span", { style: { fontSize: 15, lineHeight: 1, marginRight: 2 }, "aria-hidden": true }, "‹"), t("panel.title"))
+				: h("h3", { style: { margin: 0, fontSize: 16 } }, t("dock.title")),
 			h("div", { style: { marginLeft: "auto", display: "flex", gap: 6 } },
 				h(ThemeToggle, { ctx }),
 				h(Btn, { size: "sm", busy, onClick: load }, t("action.refresh")))),
 		error ? h("div", { className: "dmi-error" }, error) : null,
-		view === null && error === "" ? h("div", { className: "dmi-empty" }, "…") : h("div", { style: { display: "flex", flexDirection: "column", gap: 12 } },
-			h("div", { className: "dmi-card" },
+		view === null && error === "" ? h("div", { className: "dmi-empty" }, "…") :
+		view === null ? null :
+		inDetail ? h("div", { className: "dmi-detail-body", style: { display: "flex", flexDirection: "column", gap: 12 } },
+			h("div", { style: { fontSize: 19, fontWeight: 750, letterSpacing: "-.5px" } }, t("tab." + page)),
+			TabBody(page, { view, post, busy }),
+			h("div", { className: "dmi-actions" },
+				h(Btn, { size: "sm", variant: "primary", onClick: openFull }, t("ov.open"))))
+		: h("div", { style: { display: "flex", flexDirection: "column", gap: 12 } },
+			// 摘要块本身可点击：栏内展开对应域，不再只有「跳主面板」一条路。
+			h("button", { type: "button", className: "dmi-card dmi-dockopen", onClick: () => setPage("identity") },
 				h("div", { className: "dmi-card-title" }, who),
 				h("div", { className: "dmi-kv" },
 					id.gender ? h("span", null, id.gender) : null,
 					id.birthplace ? h("span", null, id.birthplace) : null,
 					id.origin ? h("span", null, t("f.origin") + "：" + id.origin) : null),
-				h("div", { className: "dmi-muted", style: { fontSize: 11 } }, t("dock.identity"))),
+				h("div", { className: "dmi-muted", style: { fontSize: 11 } }, t("dock.identity") + " ›")),
 			// 统计网格只放统计卡；空态与按钮各自独立成行，不进 grid（否则按钮被拉成网格单元）。
-			cny ? h("div", { className: "dmi-stats" },
+			cny ? h("button", { type: "button", className: "dmi-stats dmi-dockopen", onClick: () => setPage("assets") },
 				h("div", { key: "g", className: "dmi-stat dmi-stat--hero" }, h("span", null, t("stat.grand")), h("b", null, fmtMoney(cny.grand))),
 				h("div", { key: "b", className: "dmi-stat" }, h("span", null, t("stat.bank")), h("b", null, fmtMoney(cny.bank))),
 				h("div", { key: "p", className: "dmi-stat" }, h("span", null, t("stat.pay")), h("b", null, fmtMoney(cny.pay))),
 				h("div", { key: "s", className: "dmi-stat" }, h("span", null, t("stat.stock")), h("b", null, fmtMoney(cny.stock))),
 				h("div", { key: "h", className: "dmi-stat" }, h("span", null, t("stat.holdings")), h("b", null, fmtMoney(cny.holdings))))
 				: h("div", { className: "dmi-empty" }, t("ov.empty")),
+			// 其余三个域的快捷入口：窄列里也要能直接查看。
+			h("div", { className: "dmi-docknav" },
+				["career", "relations", "reflections"].map((key) =>
+					h("button", { key, type: "button", className: "dmi-docknav-btn", onClick: () => setPage(key) }, t("tab." + key)))),
 			h("div", { className: "dmi-actions" },
-				h(Btn, { size: "sm", variant: "primary", onClick: () => { try { const l = serviceOf(ctx, "layout"); if (l && l.selectPanel) l.selectPanel("myinfo"); } catch (e) {} } }, t("ov.open"))),
-			(assets.holdings || []).length > 0 ? h("div", { className: "dmi-card" },
-				h("div", { className: "dmi-card-title" }, t("holdings.of") + " · " + assets.holdings.length),
+				h(Btn, { size: "sm", variant: "primary", onClick: openFull }, t("ov.open"))),
+			(assets.holdings || []).length > 0 ? h("button", { type: "button", className: "dmi-card dmi-dockopen", onClick: () => setPage("assets") },
+				h("div", { className: "dmi-card-title" }, t("holdings.of") + " · " + assets.holdings.length + " ›"),
 				h("div", { className: "dmi-kv" }, assets.holdings.slice(0, 5).map((x) =>
 					h("span", { key: x.id }, x.code + (x.name ? " " + x.name : "") + " × " + x.shares)))) : null));
 }
