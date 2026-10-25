@@ -8,10 +8,12 @@
 - **人生感悟**：按日期归档的时间线
 - **资产台账**：银行卡、支付宝、微信余额；股票账户余额与持仓（如同花顺 A 股持仓），按币种自动汇总
 
-两个入口共用同一份数据（`$DSH_HOME/integrations/dsh-myinfo/data.json`，权限 0600，绝不离开本机）：
+三个界面入口 + agent 工具共用同一份数据（`$DSH_HOME/integrations/dsh-myinfo/data.json`，权限 0600，绝不离开本机）：
 
 - **agent 工具**：`personal_identity` / `personal_career` / `personal_relations` / `personal_reflections` / `personal_assets`，聊天里直接记录与查询；
-- **设置面板**：DSH 设置 → 「个人信息」，五个页签可视化编辑。
+- **主面板**（Apple 风格）：侧栏「个人档案」图标 → 整页档案（hero 头 + 分段控件五域）；
+- **资产速览浮窗**：右下角毛玻璃胶囊显示总资产，点开速览卡、一键跳主面板，每分钟自动刷新；
+- **设置面板**：DSH 设置 → 「个人信息」，与主面板共用的五域表单。
 
 设计文档见 [docs/requirements.md](docs/requirements.md)（需求与数据建模）与 [docs/design.md](docs/design.md)（控制流/数据流/模块），并经多模型 workflow 交叉评审（[docs/workflow-report.md](docs/workflow-report.md)）。
 

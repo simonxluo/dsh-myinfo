@@ -78,6 +78,11 @@ zh: {
 	"f.kind": "类型", "kind.bank": "银行卡", "kind.pay": "支付软件", "kind.stock": "股票账户",
 	"f.mask": "尾号/标识", "f.balance": "余额", "f.currency": "币种",
 	"f.account": "归属账户", "f.code": "代码", "f.market": "市场", "f.shares": "股数", "f.costPrice": "成本价", "f.price": "现价",
+	"panel.title": "个人档案",
+	"ov.title": "资产速览",
+	"ov.open": "打开完整档案",
+	"ov.empty": "暂无资产 · 点击录入",
+	"ov.updated": "更新于",
 	"stat.bank": "银行卡", "stat.pay": "支付软件", "stat.stock": "股票账户余额", "stat.holdings": "持仓市值", "stat.grand": "总资产",
 	"holdings.of": "持仓明细",
 	"confirm.delete": "确认删除？",
@@ -116,6 +121,11 @@ en: {
 	"f.kind": "Type", "kind.bank": "Bank card", "kind.pay": "Payments", "kind.stock": "Stock account",
 	"f.mask": "Mask", "f.balance": "Balance", "f.currency": "Currency",
 	"f.account": "Account", "f.code": "Code", "f.market": "Market", "f.shares": "Shares", "f.costPrice": "Cost", "f.price": "Price",
+	"panel.title": "Profile",
+	"ov.title": "Assets",
+	"ov.open": "Open full profile",
+	"ov.empty": "No assets yet",
+	"ov.updated": "Updated",
 	"stat.bank": "Bank", "stat.pay": "Payments", "stat.stock": "Stock balance", "stat.holdings": "Holdings value", "stat.grand": "Net total",
 	"holdings.of": "Holdings",
 	"confirm.delete": "Delete this entry?",
@@ -152,54 +162,169 @@ async function api(action, payload) {
 // 样式（dmi-*）
 // ---------------------------------------------------------------------------
 
+// Apple 设计语言：SF 字体栈、毛玻璃材质、hairline 分隔、大圆角、克制动效。
+// 明暗双主题由 .dmi-scope / .dmi-scope.dmi-dark 切换；默认跟随系统偏好。
 const STYLE_CSS = ""
-+ ".dmi-root{display:flex;flex-direction:column;gap:14px;font-size:13px}"
-+ ".dmi-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:10px}"
-+ ".dmi-head h3{margin:0;font-size:16px}"
-+ ".dmi-sub{opacity:.65}"
-+ ".dmi-updated{margin-left:auto;opacity:.5;font-size:12px}"
-+ ".dmi-tabs{display:flex;gap:6px;flex-wrap:wrap}"
-+ ".dmi-tab{padding:5px 14px;border-radius:999px;border:1px solid rgba(127,127,127,.35);background:transparent;color:inherit;cursor:pointer;font-size:13px}"
-+ ".dmi-tab:hover{background:rgba(127,127,127,.12)}"
-+ ".dmi-tab.is-active{background:#3b82f6;border-color:#3b82f6;color:#fff}"
-+ ".dmi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}"
-+ ".dmi-card{border:1px solid rgba(127,127,127,.25);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:6px}"
++ ".dmi-scope{--dmi-accent:#007AFF;--dmi-red:#FF3B30;--dmi-green:#34C759;--dmi-orange:#FF9500;"
++ "--dmi-text:#1d1d1f;--dmi-text-2:rgba(60,60,67,.66);--dmi-text-3:rgba(60,60,67,.4);"
++ "--dmi-sep:rgba(0,0,0,.08);--dmi-fill:rgba(120,120,128,.10);--dmi-fill-2:rgba(120,120,128,.16);"
++ "--dmi-bg:rgba(255,255,255,.72);--dmi-bg-elev:rgba(255,255,255,.88);--dmi-bg-opaque:#f5f5f7;"
++ "--dmi-shadow:0 10px 40px rgba(0,0,0,.14),0 2px 10px rgba(0,0,0,.06);--dmi-shadow-sm:0 2px 10px rgba(0,0,0,.08);"
++ "font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','PingFang SC','Helvetica Neue',sans-serif;"
++ "-webkit-font-smoothing:antialiased;color:var(--dmi-text)}"
++ ".dmi-scope.dmi-dark{--dmi-accent:#0A84FF;--dmi-red:#FF453A;--dmi-green:#30D158;--dmi-orange:#FF9F0A;"
++ "--dmi-text:#f5f5f7;--dmi-text-2:rgba(235,235,245,.64);--dmi-text-3:rgba(235,235,245,.42);"
++ "--dmi-sep:rgba(255,255,255,.12);--dmi-fill:rgba(120,120,128,.24);--dmi-fill-2:rgba(120,120,128,.34);"
++ "--dmi-bg:rgba(32,32,36,.66);--dmi-bg-elev:rgba(48,48,52,.82);--dmi-bg-opaque:#1c1c1e;"
++ "--dmi-shadow:0 12px 44px rgba(0,0,0,.5),0 2px 12px rgba(0,0,0,.3);--dmi-shadow-sm:0 2px 12px rgba(0,0,0,.35)}"
++ ".dmi-scope *{box-sizing:border-box}"
+// —— 通用控件：按钮（iOS fill / tinted / plain）、输入、分段控件 ——
++ ".dmi-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:6px 16px;font-size:13px;font-weight:500;border-radius:999px;cursor:pointer;border:none;background:var(--dmi-fill);color:var(--dmi-text);transition:background .18s,transform .12s,opacity .18s;white-space:nowrap;font-family:inherit}"
++ ".dmi-btn:hover:not(:disabled){background:var(--dmi-fill-2)}"
++ ".dmi-btn:active:not(:disabled){transform:scale(.96)}"
++ ".dmi-btn:disabled{opacity:.4;cursor:default}"
++ ".dmi-btn--sm{padding:3px 12px;font-size:12px}"
++ ".dmi-btn--primary{background:var(--dmi-accent);color:#fff}"
++ ".dmi-btn--primary:hover:not(:disabled){background:var(--dmi-accent);filter:brightness(1.08)}"
++ ".dmi-btn--danger{color:var(--dmi-red);background:transparent}"
++ ".dmi-btn--danger:hover:not(:disabled){background:rgba(255,59,48,.1)}"
++ ".dmi-seg{display:inline-flex;background:var(--dmi-fill);border-radius:10px;padding:2px;gap:2px}"
++ ".dmi-seg button{border:none;background:transparent;padding:5px 14px;border-radius:8px;font:inherit;font-size:13px;color:var(--dmi-text-2);cursor:pointer;transition:color .18s,background .18s,box-shadow .18s;white-space:nowrap}"
++ ".dmi-seg button:hover{color:var(--dmi-text)}"
++ ".dmi-seg button.is-active{background:var(--dmi-bg-elev);color:var(--dmi-text);font-weight:600;box-shadow:0 1px 4px rgba(0,0,0,.1),0 1px 2px rgba(0,0,0,.06)}"
++ ".dmi-input,.dmi-select,.dmi-textarea{padding:7px 12px;border-radius:10px;border:none;background:var(--dmi-fill);color:var(--dmi-text);font-size:13px;font-family:inherit;width:100%;transition:box-shadow .18s,background .18s;outline:none}"
++ ".dmi-input:focus,.dmi-select:focus,.dmi-textarea:focus{background:var(--dmi-bg-elev);box-shadow:0 0 0 3px color-mix(in srgb,var(--dmi-accent) 30%,transparent)}"
++ ".dmi-textarea{min-height:76px;resize:vertical;line-height:1.55}"
++ ".dmi-input::placeholder,.dmi-textarea::placeholder{color:var(--dmi-text-3)}"
+// —— 布局骨架 ——
++ ".dmi-root{display:flex;flex-direction:column;gap:14px;font-size:13px;line-height:1.5}"
++ ".dmi-head{display:flex;flex-wrap:wrap;align-items:center;gap:10px}"
++ ".dmi-head h3{margin:0;font-size:20px;font-weight:700;letter-spacing:-.3px}"
++ ".dmi-sub{opacity:.65;font-size:12px}"
++ ".dmi-updated{margin-left:auto;color:var(--dmi-text-3);font-size:11px}"
++ ".dmi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:12px}"
++ ".dmi-card{border:1px solid var(--dmi-sep);border-radius:16px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;background:var(--dmi-bg-elev);box-shadow:var(--dmi-shadow-sm);transition:transform .18s}"
++ ".dmi-card:hover{transform:translateY(-1px)}"
 + ".dmi-card-head{display:flex;align-items:center;gap:8px}"
-+ ".dmi-card-title{font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}"
-+ ".dmi-kv{display:flex;flex-wrap:wrap;gap:6px 12px;opacity:.85}"
-+ ".dmi-muted{opacity:.55}"
-+ ".dmi-chip{display:inline-flex;align-items:center;padding:1px 10px;border-radius:999px;border:1px solid rgba(127,127,127,.3);font-size:12px;white-space:nowrap}"
-+ ".dmi-chip--ok{border-color:rgba(34,197,94,.6);color:#16a34a;background:rgba(34,197,94,.08)}"
-+ ".dmi-chip--money{border-color:rgba(59,130,246,.45);color:#2563eb;background:rgba(59,130,246,.07);font-variant-numeric:tabular-nums}"
-+ ".dmi-chip--warn{border-color:rgba(234,179,8,.5);background:rgba(234,179,8,.08)}"
-+ ".dmi-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:5px 14px;font-size:13px;border-radius:999px;cursor:pointer;border:1px solid rgba(127,127,127,.35);background:transparent;color:inherit;transition:background .15s,border-color .15s;white-space:nowrap}"
-+ ".dmi-btn:hover:not(:disabled){background:rgba(127,127,127,.12)}"
-+ ".dmi-btn:disabled{opacity:.45;cursor:not-allowed}"
-+ ".dmi-btn--sm{padding:2px 11px;font-size:12px}"
-+ ".dmi-btn--primary{background:#3b82f6;border-color:#3b82f6;color:#fff}"
-+ ".dmi-btn--primary:hover:not(:disabled){background:#2563eb;border-color:#2563eb}"
-+ ".dmi-btn--danger{color:#dc2626;border-color:rgba(220,38,38,.4)}"
-+ ".dmi-btn--danger:hover:not(:disabled){background:rgba(239,68,68,.12)}"
++ ".dmi-card-title{font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;letter-spacing:-.2px}"
++ ".dmi-kv{display:flex;flex-wrap:wrap;gap:6px 12px;color:var(--dmi-text-2)}"
++ ".dmi-muted{color:var(--dmi-text-3)}"
 + ".dmi-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}"
-+ ".dmi-form{border:1px dashed rgba(127,127,127,.4);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:10px}"
-+ ".dmi-fieldrow{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}"
-+ ".dmi-field{display:flex;flex-direction:column;gap:4px;min-width:0}"
-+ ".dmi-field>span{font-size:12px;opacity:.65}"
++ ".dmi-form{border:1px solid var(--dmi-sep);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:12px;background:var(--dmi-bg-elev);box-shadow:var(--dmi-shadow-sm)}"
++ ".dmi-fieldrow{display:grid;grid-template-columns:repeat(auto-fill,minmax(214px,1fr));gap:12px}"
++ ".dmi-field{display:flex;flex-direction:column;gap:5px;min-width:0}"
++ ".dmi-field>span{font-size:12px;color:var(--dmi-text-2)}"
 + ".dmi-field-wide{grid-column:1 / -1}"
-+ ".dmi-input,.dmi-select,.dmi-textarea{padding:6px 10px;border-radius:8px;border:1px solid rgba(127,127,127,.4);background:transparent;color:inherit;font-size:13px;font-family:inherit;width:100%;box-sizing:border-box}"
-+ ".dmi-input:focus,.dmi-select:focus,.dmi-textarea:focus{outline:2px solid rgba(59,130,246,.5);outline-offset:0}"
-+ ".dmi-textarea{min-height:72px;resize:vertical}"
-+ ".dmi-empty{opacity:.55;padding:14px 4px}"
-+ ".dmi-error{border:1px solid rgba(220,38,38,.45);background:rgba(239,68,68,.08);color:#dc2626;border-radius:10px;padding:8px 12px;white-space:pre-wrap}"
-+ ".dmi-timeline-year{font-weight:700;margin:10px 0 4px}"
-+ ".dmi-stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}"
-+ ".dmi-stat{border:1px solid rgba(127,127,127,.25);border-radius:10px;padding:8px 12px;display:flex;flex-direction:column;gap:2px}"
-+ ".dmi-stat b{font-size:15px;font-variant-numeric:tabular-nums}"
-+ ".dmi-stat span{font-size:12px;opacity:.6}"
-+ ".dmi-table{width:100%;border-collapse:collapse}"
-+ ".dmi-table th,.dmi-table td{text-align:left;padding:5px 8px;border-bottom:1px solid rgba(127,127,127,.18);font-variant-numeric:tabular-nums}"
-+ ".dmi-table th{font-size:12px;opacity:.6;font-weight:500}"
-+ ".dmi-section-title{font-weight:600;margin:6px 0 2px}";
++ ".dmi-empty{color:var(--dmi-text-3);padding:20px 6px;text-align:center;font-size:13px}"
++ ".dmi-error{border:none;background:rgba(255,59,48,.1);color:var(--dmi-red);border-radius:12px;padding:9px 14px;white-space:pre-wrap;font-size:13px}"
++ ".dmi-timeline-year{font-weight:700;margin:14px 0 6px;font-size:15px;letter-spacing:-.2px}"
+// —— 芯片与统计 ——
++ ".dmi-chip{display:inline-flex;align-items:center;padding:2px 11px;border-radius:999px;font-size:12px;white-space:nowrap;background:var(--dmi-fill);color:var(--dmi-text-2);border:none;font-weight:500}"
++ ".dmi-chip--ok{background:rgba(52,199,89,.12);color:var(--dmi-green)}"
++ ".dmi-chip--money{background:color-mix(in srgb,var(--dmi-accent) 12%,transparent);color:var(--dmi-accent);font-variant-numeric:tabular-nums}"
++ ".dmi-chip--warn{background:rgba(255,149,0,.12);color:var(--dmi-orange)}"
++ ".dmi-stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(156px,1fr));gap:12px}"
++ ".dmi-stat{border:1px solid var(--dmi-sep);border-radius:16px;padding:12px 14px;display:flex;flex-direction:column;gap:3px;background:var(--dmi-bg-elev);box-shadow:var(--dmi-shadow-sm)}"
++ ".dmi-stat b{font-size:17px;font-variant-numeric:tabular-nums;letter-spacing:-.3px}"
++ ".dmi-stat span{font-size:11px;color:var(--dmi-text-3)}"
++ ".dmi-stat--hero{grid-column:1 / -1;background:linear-gradient(135deg,color-mix(in srgb,var(--dmi-accent) 10%,transparent),transparent);border-color:color-mix(in srgb,var(--dmi-accent) 24%,var(--dmi-sep))}"
++ ".dmi-stat--hero b{font-size:30px;font-weight:700;letter-spacing:-.6px}"
++ ".dmi-table{width:100%;border-collapse:collapse;font-size:13px}"
++ ".dmi-table th,.dmi-table td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--dmi-sep);font-variant-numeric:tabular-nums}"
++ ".dmi-table th{font-size:11px;color:var(--dmi-text-3);font-weight:500;text-transform:none}"
++ ".dmi-section-title{font-weight:650;margin:10px 0 4px;font-size:14px;letter-spacing:-.2px}"
+// —— 主面板（main keyed slot）页面 ——
++ ".dmi-page{height:100%;display:flex;flex-direction:column;min-height:0;overflow:auto;padding:28px 32px 40px;scrollbar-width:thin}"
++ ".dmi-page-head{display:flex;flex-wrap:wrap;align-items:flex-end;gap:14px;margin-bottom:18px}"
++ ".dmi-page-title{font-size:28px;font-weight:750;letter-spacing:-.6px;margin:0}"
++ ".dmi-page-sub{color:var(--dmi-text-2);font-size:13px;margin-top:4px}"
+// —— 浮窗（shell.overlay，position:fixed 自绘） ——
++ ".dmi-ov{position:fixed;right:20px;bottom:20px;z-index:9990;pointer-events:auto;font-variant-numeric:tabular-nums}"
++ ".dmi-ov-pill{display:flex;align-items:center;gap:8px;padding:8px 16px;border-radius:999px;background:var(--dmi-bg);border:1px solid var(--dmi-sep);box-shadow:var(--dmi-shadow);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);color:var(--dmi-text);cursor:pointer;font-size:13px;font-weight:600;letter-spacing:-.2px;transition:transform .18s,box-shadow .18s;user-select:none}"
++ ".dmi-ov-pill:hover{transform:translateY(-2px);box-shadow:0 14px 46px rgba(0,0,0,.2)}"
++ ".dmi-ov-pill b{font-size:15px;letter-spacing:-.3px}"
++ ".dmi-ov-dot{width:8px;height:8px;border-radius:50%;background:var(--dmi-green);box-shadow:0 0 6px var(--dmi-green)}"
++ ".dmi-ov-card{width:328px;border-radius:22px;background:var(--dmi-bg);border:1px solid var(--dmi-sep);box-shadow:var(--dmi-shadow);backdrop-filter:blur(32px) saturate(180%);-webkit-backdrop-filter:blur(32px) saturate(180%);overflow:hidden;color:var(--dmi-text);display:flex;flex-direction:column;animation:dmi-ov-in .28s cubic-bezier(.25,.1,.25,1)}"
++ "@keyframes dmi-ov-in{from{opacity:0;transform:translateY(14px) scale(.96)}to{opacity:1;transform:none}}"
++ ".dmi-ov-head{display:flex;align-items:center;gap:8px;padding:14px 16px 6px}"
++ ".dmi-ov-title{font-weight:650;font-size:13px;flex:1;letter-spacing:-.2px}"
++ ".dmi-ov-x{border:none;background:var(--dmi-fill);color:var(--dmi-text-2);width:22px;height:22px;border-radius:50%;cursor:pointer;font-size:11px;line-height:1;display:inline-flex;align-items:center;justify-content:center}"
++ ".dmi-ov-x:hover{background:var(--dmi-fill-2);color:var(--dmi-text)}"
++ ".dmi-ov-hero{padding:4px 18px 12px;display:flex;flex-direction:column;gap:2px}"
++ ".dmi-ov-hero b{font-size:30px;font-weight:750;letter-spacing:-.8px}"
++ ".dmi-ov-hero span{font-size:11px;color:var(--dmi-text-3)}"
++ ".dmi-ov-rows{padding:2px 10px 8px;display:flex;flex-direction:column}"
++ ".dmi-ov-row{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:12px}"
++ ".dmi-ov-row:hover{background:var(--dmi-fill)}"
++ ".dmi-ov-row-ico{width:30px;height:30px;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;font-size:14px;background:var(--dmi-fill);flex:none}"
++ ".dmi-ov-row-label{flex:1;font-size:13px;font-weight:500}"
++ ".dmi-ov-row-val{font-size:13px;font-weight:600;font-variant-numeric:tabular-nums}"
++ ".dmi-ov-foot{display:flex;gap:8px;padding:10px 14px 14px;border-top:none}";
+
+
+/** 明暗主题：优先宿主 theme 服务，回退系统 prefers-color-scheme。 */
+function darkClassOf(ctx) {
+	try {
+		const theme = (ctx && ctx.theme) || (typeof ctx.get === "function" ? ctx.get("theme") : undefined);
+		if (theme && typeof theme.getTheme === "function") {
+			const snap = theme.getTheme();
+			const id = String((snap && (snap.id || snap.themeId)) || "");
+			if (id.indexOf("dark") >= 0 || snap && snap.dark === true) return " dmi-dark";
+			if (id !== "") return "";
+		}
+	} catch (e) { /* 无 theme 服务则走系统偏好 */ }
+	return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? " dmi-dark" : "";
+}
+
+
+/** 样式只注入一次：挂载/卸载往返不会在文档里叠加重复的 <style> 节点。 */
+var styleInjected = false;
+function ensureStyle() {
+	if (styleInjected || typeof document === "undefined") return;
+	if (document.getElementById("dsh-myinfo-style") !== null) {
+		styleInjected = true;
+		return;
+	}
+	const el = document.createElement("style");
+	el.id = "dsh-myinfo-style";
+	el.textContent = STYLE_CSS;
+	document.head.appendChild(el);
+	styleInjected = true;
+}
+
+// ---------------------------------------------------------------------------
+// 共享数据流：面板 API 的加载/提交（设置页、主面板、浮窗共用）
+// ---------------------------------------------------------------------------
+
+function useMyInfoData() {
+	const [view, setView] = useState(null);
+	const [error, setError] = useState("");
+	const [busy, setBusy] = useState(false);
+	const alive = useRef(true);
+	useEffect(() => () => { alive.current = false; }, []);
+	const load = useCallback(async () => {
+		try {
+			const value = await api(undefined);
+			if (!alive.current) return;
+			setView(value);
+			setError("");
+		} catch (err) {
+			if (alive.current) setError(t("error.load") + String(err && err.message ? err.message : err));
+		}
+	}, []);
+	const post = useCallback(async (action, payload) => {
+		setBusy(true);
+		try {
+			await api(action, payload);
+			await load();
+		} catch (err) {
+			if (alive.current) setError(t("error.save") + String(err && err.message ? err.message : err));
+		} finally {
+			if (alive.current) setBusy(false);
+		}
+	}, [load]);
+	return { view, error, busy, load, post };
+}
 
 // ---------------------------------------------------------------------------
 // 小组件
@@ -643,86 +768,141 @@ function AssetsTab(props) {
 }
 
 // ---------------------------------------------------------------------------
-// 区块根组件
+// 根组件们：设置页区块 / 中央主面板 / 侧栏图标 / 资产速览浮窗
 // ---------------------------------------------------------------------------
 
 const TAB_KEYS = ["identity", "career", "relations", "reflections", "assets"];
 
-/** 样式只注入一次：挂载/卸载往返不会在文档里叠加重复的 <style> 节点。 */
-var styleInjected = false;
-function ensureStyle() {
-	if (styleInjected || typeof document === "undefined") return;
-	if (document.getElementById("dsh-myinfo-style") !== null) {
-		styleInjected = true;
-		return;
-	}
-	const el = document.createElement("style");
-	el.id = "dsh-myinfo-style";
-	el.textContent = STYLE_CSS;
-	document.head.appendChild(el);
-	styleInjected = true;
+/** 按 tab 键渲染对应的内容组件。 */
+function TabBody(tab, tabProps) {
+	if (tab === "identity") return h(IdentityTab, tabProps);
+	if (tab === "career") return h(CareerTab, tabProps);
+	if (tab === "relations") return h(RelationsTab, tabProps);
+	if (tab === "reflections") return h(ReflectionsTab, tabProps);
+	return h(AssetsTab, tabProps);
 }
 
+/** 设置页里的「个人信息」区块（settings.section）。 */
 function MyInfoSection(props, ctx) {
 	const [, setLangTick] = useState(0);
-	const [view, setView] = useState(null);
-	const [error, setError] = useState("");
-	const [busy, setBusy] = useState(false);
 	const [tab, setTab] = useState("identity");
-	const alive = useRef(true);
-
-	useEffect(() => () => { alive.current = false; }, []);
+	const { view, error, busy, load, post } = useMyInfoData();
 	useEffect(() => {
 		relocalize = () => setLangTick((v) => v + 1);
 		return () => { relocalize = null; };
 	}, []);
-
-	const load = useCallback(async () => {
-		try {
-			const value = await api(undefined);
-			if (!alive.current) return;
-			setView(value);
-			setError("");
-		} catch (err) {
-			if (alive.current) setError(t("error.load") + String(err && err.message ? err.message : err));
-		}
-	}, []);
-
 	useEffect(() => { load(); }, [load]);
-
-	const post = useCallback(async (action, payload) => {
-		setBusy(true);
-		try {
-			await api(action, payload);
-			await load();
-		} catch (err) {
-			if (alive.current) setError(t("error.save") + String(err && err.message ? err.message : err));
-		} finally {
-			if (alive.current) setBusy(false);
-		}
-	}, [load]);
-
 	const tabProps = { view, post, busy };
 	ensureStyle();
-	return h("div", { className: "dmi-root" },
-		h("div", { className: "dmi-head" },
-			h("h3", null, t("title")),
-			view && view.meta ? h("span", { className: "dmi-updated" }, t("hint.updatedAt") + "：" + String(view.meta.updatedAt || "").replace("T", " ").slice(0, 19)) : null,
-			h(Btn, { size: "sm", onClick: load }, t("action.refresh"))),
-		h("div", { className: "dmi-sub" }, t("subtitle")),
-		error ? h("div", { className: "dmi-error" }, error) : null,
-		h("div", { className: "dmi-tabs" }, TAB_KEYS.map((key) =>
-			h("button", {
-				key, className: "dmi-tab" + (tab === key ? " is-active" : ""), onClick: () => setTab(key),
-			}, t("tab." + key)))),
-		view === null && error === "" ? h("div", { className: "dmi-empty" }, "…") :
-		view === null ? null :
-		tab === "identity" ? h(IdentityTab, tabProps) :
-		tab === "career" ? h(CareerTab, tabProps) :
-		tab === "relations" ? h(RelationsTab, tabProps) :
-		tab === "reflections" ? h(ReflectionsTab, tabProps) :
-		h(AssetsTab, tabProps));
+	return h("div", { className: "dmi-scope" + darkClassOf(ctx) },
+		h("div", { className: "dmi-root" },
+			h("div", { className: "dmi-head" },
+				h("h3", null, t("title")),
+				view && view.meta ? h("span", { className: "dmi-updated" }, t("hint.updatedAt") + "：" + String(view.meta.updatedAt || "").replace("T", " ").slice(0, 19)) : null,
+				h(Btn, { size: "sm", onClick: load }, t("action.refresh"))),
+			h("div", { className: "dmi-sub" }, t("subtitle")),
+			error ? h("div", { className: "dmi-error" }, error) : null,
+			h("div", { className: "dmi-seg" }, TAB_KEYS.map((key) =>
+				h("button", { key, className: tab === key ? "is-active" : "", onClick: () => setTab(key) }, t("tab." + key)))),
+			view === null && error === "" ? h("div", { className: "dmi-empty" }, "…") :
+			view === null ? null : TabBody(tab, tabProps)));
 }
+
+/** 侧栏面板图标（sidebar.panellist）：SF Symbols 风格人像。 */
+function MyInfoIcon(props) {
+	const size = (props && props.size) || 20;
+	return h("svg", { width: size, height: size, viewBox: "0 0 24 24", fill: "none", "aria-hidden": true },
+		h("circle", { cx: 12, cy: 8, r: 3.6, fill: "currentColor" }),
+		h("path", { d: "M5 19.4c1-3.6 3.8-5.4 7-5.4s6 1.8 7 5.4", stroke: "currentColor", strokeWidth: 2.2, strokeLinecap: "round" }));
+}
+
+/** 中央主面板（main keyed slot，id=myinfo）：Apple 风整页档案。 */
+function MyInfoPanel(props, ctx) {
+	const [, setLangTick] = useState(0);
+	const [tab, setTab] = useState("identity");
+	const { view, error, busy, load, post } = useMyInfoData();
+	useEffect(() => {
+		relocalize = () => setLangTick((v) => v + 1);
+		return () => { relocalize = null; };
+	}, []);
+	useEffect(() => { load(); }, [load]);
+	const id = (view && view.identity) || {};
+	const totals = view && view.assets && view.assets.totals ? view.assets.totals.totals || {} : {};
+	const grand = totals.CNY ? totals.CNY.grand : null;
+	const who = [id.name, id.age !== null && id.age !== undefined ? id.age + " 岁" : "", id.residence].filter(Boolean).join(" · ");
+	ensureStyle();
+	return h("div", { className: "dmi-scope dmi-page" + darkClassOf(ctx) },
+		h("div", { className: "dmi-page-head" },
+			h("div", { style: { flex: 1, minWidth: 220 } },
+				h("h2", { className: "dmi-page-title" }, t("panel.title")),
+				h("div", { className: "dmi-page-sub" }, who || t("subtitle"))),
+			h(Btn, { size: "sm", onClick: load }, t("action.refresh")),
+			grand !== null ? h(Chip, { tone: "money", title: t("stat.grand") }, fmtMoney(grand)) : null),
+		h("div", { className: "dmi-seg", style: { marginBottom: 16 } }, TAB_KEYS.map((key) =>
+			h("button", { key, className: tab === key ? "is-active" : "", onClick: () => setTab(key) }, t("tab." + key)))),
+		error ? h("div", { className: "dmi-error" }, error) : null,
+		view === null && error === "" ? h("div", { className: "dmi-empty" }, "…") :
+		view === null ? null : TabBody(tab, { view, post, busy }));
+}
+
+/** 资产速览浮窗（shell.overlay）：右下角胶囊 ↔ 毛玻璃速览卡。 */
+function AssetOverlay(props, ctx) {
+	const { view, load } = useMyInfoData();
+	const [expanded, setExpanded] = useState(false);
+	useEffect(() => { load(); }, [load]);
+	// 每分钟静默刷新一次（浮窗常驻，最新余额很重要）
+	useEffect(() => {
+		const timer = window.setInterval(() => { load(); }, 60000);
+		return () => window.clearInterval(timer);
+	}, [load]);
+	ensureStyle();
+	const assets = (view && view.assets) || { accounts: [], holdings: [], totals: { totals: {} } };
+	const totals = (assets.totals && assets.totals.totals) || {};
+	const cny = totals.CNY || null;
+	const hasData = cny !== null || (assets.accounts || []).length > 0;
+	const dark = darkClassOf(ctx);
+	const openPanel = () => {
+		try {
+			const layout = (typeof ctx.get === "function" ? ctx.get("layout") : undefined) || ctx.layout;
+			if (layout && typeof layout.selectPanel === "function") layout.selectPanel("myinfo");
+		} catch (e) { /* 布局服务不可用则忽略 */ }
+	};
+	if (!expanded) {
+		return h("div", { className: "dmi-scope dmi-ov" + dark },
+			h("div", {
+				className: "dmi-ov-pill", title: t("ov.title"),
+				onClick: () => { if (hasData) setExpanded(true); else openPanel(); },
+			},
+				h("span", { className: "dmi-ov-dot" }),
+				hasData && cny ? h("b", null, fmtMoney(cny.grand)) : h("span", null, t("ov.empty"))));
+	}
+	const rows = cny ? [
+		["🏦", t("stat.bank"), cny.bank],
+		["💚", t("stat.pay"), cny.pay],
+		["📈", t("stat.stock"), cny.stock],
+		["💎", t("stat.holdings"), cny.holdings],
+	] : [];
+	return h("div", { className: "dmi-scope dmi-ov" + dark },
+		h("div", { className: "dmi-ov-card" },
+			h("div", { className: "dmi-ov-head" },
+				h("span", { className: "dmi-ov-title" }, t("ov.title")),
+				h("button", { className: "dmi-ov-x", title: t("action.cancel"), onClick: () => setExpanded(false) }, "✕")),
+			h("div", { className: "dmi-ov-hero" },
+				h("b", null, cny ? fmtMoney(cny.grand) : t("misc.none")),
+				h("span", null, t("stat.grand") + (view && view.meta && view.meta.updatedAt ? " · " + t("ov.updated") + " " + String(view.meta.updatedAt).replace("T", " ").slice(11, 19) : ""))),
+			h("div", { className: "dmi-ov-rows" }, rows.map(([ico, label, val]) =>
+				h("div", { key: label, className: "dmi-ov-row" },
+					h("span", { className: "dmi-ov-row-ico" }, ico),
+					h("span", { className: "dmi-ov-row-label" }, label),
+					h("span", { className: "dmi-ov-row-val" }, fmtMoney(val))))),
+			h("div", { className: "dmi-ov-foot" },
+				h(Btn, { size: "sm", variant: "primary", onClick: openPanel }, t("ov.open")),
+				h(Btn, { size: "sm", onClick: load }, t("action.refresh")))));
+}
+
+// ---------------------------------------------------------------------------
+// 插件装配：设置页区块 + 中央面板 + 侧栏图标 + 资产速览浮窗
+// ---------------------------------------------------------------------------
 
 function apply(ctx) {
 	ctx.effect(() => subscribeLocale(ctx));
@@ -733,6 +913,22 @@ function apply(ctx) {
 		label: () => t("nav.title"),
 		inject: () => ({}),
 	}, (props) => MyInfoSection(props, ctx)));
+	// 中央主面板：main keyed slot 与 sidebar.panellist 共用 id「myinfo」。
+	ctx.slots.inject("main", () => ctx.slots.register({
+		name: "main",
+		key: "myinfo",
+	}, (props) => MyInfoPanel(props, ctx)));
+	ctx.slots.inject("sidebar.panellist", () => ctx.slots.register({
+		name: "sidebar.panellist",
+		id: "myinfo",
+		order: 20,
+		label: () => t("panel.title"),
+	}, MyInfoIcon));
+	// 右下角资产速览浮窗。
+	ctx.slots.inject("shell.overlay", () => ctx.slots.register({
+		name: "shell.overlay",
+		id: "dsh-myinfo-overlay",
+	}, (props) => AssetOverlay(props, ctx)));
 }
 
 const inject = ["slots", "locale"];

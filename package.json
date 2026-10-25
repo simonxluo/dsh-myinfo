@@ -1,7 +1,7 @@
 {
   "name": "dsh-myinfo",
-  "version": "0.2.0",
-  "description": "Personal profile manager for DeepSeek Harness: identity, career history with salary, relationships, dated life reflections, and an asset ledger (bank cards, Alipay/WeChat balances, stock accounts incl. THS holdings), editable by the agent through tools and by the user through a settings panel.",
+  "version": "0.3.0",
+  "description": "Personal profile manager for DeepSeek Harness: identity, career with salary, relationships, dated reflections, and an asset ledger. Apple-styled main panel + floating asset overlay + agent tools, all local-only.",
   "type": "module",
   "license": "MIT",
   "author": "simonxluo",

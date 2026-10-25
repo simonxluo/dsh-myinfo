@@ -1,6 +1,6 @@
 # dsh-myinfo 设计文档（控制流 / 数据流 / 模块）
 
-> 前置：数据建模见 `docs/requirements.md`（先建模，后设计）。版本 v0.2.0（含 workflow 评审修复）。
+> 前置：数据建模见 `docs/requirements.md`（先建模，后设计）。版本 v0.3.0（含 workflow 评审修复 + Apple 风格主面板/浮窗）。
 
 ## 1. 模块划分
 
@@ -90,9 +90,12 @@ window.__ModuleLoader__.load({ id:'dsh-myinfo', factory })
        ├─ React = require('react')           （宿主模块表，不自带 React）
        └─ exports.apply(ctx)
             ├─ ctx.effect(() => subscribeLocale(ctx))   跟随界面语言（zh/en）
-            └─ ctx.slots.inject('settings.section', () => ctx.slots.register({
-                   id:'dsh-myinfo', order:47, label:() => t('nav.title')
-                 }, (props) => MyInfoSection(props, ctx)))
+            ├─ settings.section（list）：设置页区块
+            ├─ main（keyed，key='myinfo'）+ sidebar.panellist（list，同 id，order 20）
+            │    中央整页档案；图标收 {size}，点击由宿主切面板（ctx.layout.selectPanel('myinfo') 亦可编程跳转）
+            └─ shell.overlay（list，id='dsh-myinfo-overlay'）
+                 右下角资产速览：胶囊态/卡片态均 position:fixed 自绘，pointer-events:auto，
+                 毛玻璃 backdrop-filter，60s 定时刷新（组件 effect 内 setInterval，卸载清理）
 ```
 
 组件内部：挂载时 GET 全量视图 → 每次提交后重新 GET；无本地副本的乐观更新（避免双写不一致）。
