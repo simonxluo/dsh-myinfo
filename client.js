@@ -548,10 +548,12 @@ function Chip(props) {
 	return h("span", { className: props.tone ? "dmi-chip dmi-chip--" + props.tone : "dmi-chip", title: props.title || "" }, props.children);
 }
 
-function Field(props) {
+function Field(props, children) {
+	// 直接调用模式 Field({…}, Input({…}))：children 是第二个位置参数。
+	// 早期版本只读 props.children（永远 undefined）——表单只显示标签、没有输入框。
 	return h("div", { className: "dmi-field" + (props.wide ? " dmi-field-wide" : "") },
 		h("span", null, props.label),
-		props.children);
+		children);
 }
 
 function Input(props) {
@@ -573,12 +575,13 @@ function TextArea(props) {
 	});
 }
 
-function Select(props) {
+function Select(props, children) {
+	// 同 Field：options 作为第二个位置参数传入（直接调用模式）。
 	return h("select", {
 		className: "dmi-select",
 		value: props.value === undefined || props.value === null ? "" : props.value,
 		onChange: (e) => props.onChange(e.target.value),
-	}, props.children);
+	}, children);
 }
 
 function fmtMoney(value, currency) {
