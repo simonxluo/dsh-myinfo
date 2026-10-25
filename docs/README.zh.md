@@ -39,7 +39,7 @@
 
 ## 一份数据、五个入口
 
-所有入口读写同一份本机文件（`$DSH_HOME/integrations/dsh-myinfo/data.json`，权限 0600，绝不离开本机）：
+所有入口读写同一份 JSON 档案（默认 `$DSH_HOME/integrations/dsh-myinfo/data.json`，权限 0600；可通过插件配置 `dataFile` 改存别处——例如 agentfs/JuiceFS 挂载目录，原始数据随之云同步）：
 
 - **agent 工具**：`personal_identity` / `personal_career` / `personal_relations` / `personal_reflections` / `personal_assets`，聊天里直接记录与查询
 - **`personal_context`**：一次调用拿到完整个人上下文摘要（身份、当前在职、身边的人、最新感悟、资产合计与主要持仓），对话中实时获取用户背景
@@ -61,7 +61,7 @@ dsh plugin --profile web add dsh-myinfo
 
 ## 隐私
 
-仓库本身**不含任何个人数据**；运行期数据只写入 `$DSH_HOME`，已被 `.gitignore` 排除的本地文件也不会进入版本库。
+仓库本身**不含任何个人数据**；运行期数据默认只写入 `$DSH_HOME`（配置 `dataFile` 指向同步目录是你自己的显式选择），已被 `.gitignore` 排除的本地文件也不会进入版本库。
 
 ## 文档
 

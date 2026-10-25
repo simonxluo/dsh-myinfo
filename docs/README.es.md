@@ -39,7 +39,7 @@
 
 ## Un origen de datos, cinco superficies
 
-Todas las superficies leen y escriben el mismo archivo local (`$DSH_HOME/integrations/dsh-myinfo/data.json`, permisos 0600 — nunca sale de tu máquina):
+Todas las superficies leen y escriben un mismo dossier JSON (por defecto `$DSH_HOME/integrations/dsh-myinfo/data.json`, permisos 0600; configura `dataFile` para reubicarlo — p. ej. en un montaje agentfs/JuiceFS, que sincroniza los datos en bruto con la nube):
 
 - **Herramientas del agente** — `personal_identity` / `personal_career` / `personal_relations` / `personal_reflections` / `personal_assets`; registra y consulta directamente desde el chat
 - **`personal_context`** — una sola llamada devuelve el resumen completo del contexto personal (identidad, empleo actual, relaciones clave, última reflexión, totales de activos con principales posiciones), para que el agente capte tu fondo en tiempo real durante la conversación

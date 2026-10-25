@@ -3,7 +3,7 @@
  * 用临时 DSH_HOME，不触碰真实档案；直接断言 store 与工具的核心行为。
  */
 import { equal, rejects } from 'node:assert/strict';
-import { mkdtempSync, rmSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -174,6 +174,22 @@ const sText = (await search.output.render)({}, sName).map((x) => x.text).join('\
 if (!sText.includes('张三') || !sText.includes('个人档案搜索')) {
 	throw new Error('personal_search render should mention the query keyword and title');
 }
+
+// --- v0.8.0 dataFile 配置 + 迁移 ---
+const cfgFile = join(dir, 'agentfs-like', 'dsh-myinfo', 'data.json');
+store.setDataFile(cfgFile);
+if (!store.dataFile().includes('agentfs-like')) throw new Error('configured dataFile should win over default');
+await identity.execute({ action: 'patch', patch: { name: '李配置' } });
+equal(JSON.parse(readFileSync(cfgFile, 'utf8')).identity.name, '李配置', 'write lands in configured file');
+equal(store.migrateToConfiguredFile(), false, 'migration is a no-op when target exists');
+store.setDataFile('');
+if (!store.dataFile().includes('integrations')) throw new Error('reset to default path');
+const migratedTarget = join(dir, 'migrated', 'data.json');
+store.setDataFile(migratedTarget);
+equal(store.migrateToConfiguredFile(), true, 'legacy file migrates to configured path');
+equal(JSON.parse(readFileSync(migratedTarget, 'utf8')).identity.name, '张三', 'migration copies the legacy file content');
+if (!existsSync(join(dir, 'integrations', 'dsh-myinfo', 'data.json.migrated'))) throw new Error('legacy file renamed to .migrated');
+store.setDataFile('');
 
 // --- v0.4.x 主题修复回归：parseColorLuminance + autoDark 关键结构 ---
 import { readFileSync as _rf } from 'node:fs';

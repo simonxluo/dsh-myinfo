@@ -123,3 +123,7 @@ workflow 之后的真机端到端（直接调用注册后的 `personal_*` 工具
 ## 13. v0.7.2 编辑表单渲染修复（2026-10-25）
 
 用户反馈：点「编辑」拿不到原始信息。根因：全部表单用直接调用模式 `Field({…}, Input({…}))`/`Select({…}, options…)`，而组件只读 `props.children`（直接调用时 children 是第二个位置参数、props.children 恒为 undefined）——表单只渲染标签，输入框从未渲染（v0.2.0 起所有五个页签的编辑/新增表单全部如此，此前的 e2e 只覆盖展示渲染，未覆盖表单）。修复 Field/Select 签名为 (props, children)。harness 新增表单回归链：基本信息卡 → 编辑 → form-fields=9、首输入框值"张三"。
+
+## 14. v0.8.0 档案数据可配置落盘（agentfs/JuiceFS → COS 同步）（2026-10-25）
+
+需求：原始数据结构保存到 agentfs 目录并与 COS 服务同步。环境取证：agentfs 是 JuiceFS 挂载（LaunchAgents com.juicefs.agentfs + macfuse），写入即经 JuiceFS 云同步——无需独立同步链。实现：插件 Config 新增 volatile `dataFile`（绝对路径，空=默认 $DSH_HOME）；store.dataFile() 解析优先级 env DSH_MYINFO_DATA > 配置 > 默认；首次切换自动迁移旧默认文件（复制 + 旧文件改名 .migrated 兜底，跨文件系统安全）。原子写（tmp+fsync+rename）与 0600 保持不变；loadProfile 每次读盘，跨机更新自然可见。本机 profile 配置指向 agentfs/agent/privateInfo/dsh-myinfo/data.json。

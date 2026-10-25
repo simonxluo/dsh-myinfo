@@ -7,12 +7,25 @@
  * webServer 可用时挂载设置页面板路由（/_dsh/dsh-myinfo/panel）。
  * 数据落在 $DSH_HOME/integrations/dsh-myinfo/data.json（0600）。
  */
+import Schema from '@deepseek-ai/schemastery';
 import { buildTools } from './tools.js';
 import { installPanelWeb } from './panel.js';
+import { migrateToConfiguredFile, setDataFile } from './store.js';
 
 export const inject = ['tools'];
 
-export function apply(ctx) {
+export const Config = Schema.object({
+	dataFile: Schema.string().default('').description(
+		'Absolute path of the dossier data file. Empty keeps the default '
+		+ '$DSH_HOME/integrations/dsh-myinfo/data.json; point it at a synced directory '
+		+ '(e.g. an agentfs/JuiceFS mount) so the raw data syncs to cloud storage.'
+	).volatile(),
+});
+
+export function apply(ctx, rowConfig) {
+	const cfg = rowConfig ?? {};
+	setDataFile(cfg.dataFile ?? '');
+	try { migrateToConfiguredFile(); } catch (e) { ctx.logger?.warn?.('dsh-myinfo data migration failed'); }
 	for (const definition of buildTools()) {
 		ctx.effect(() => ctx.tools.register(definition));
 	}

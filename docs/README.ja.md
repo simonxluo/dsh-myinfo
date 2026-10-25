@@ -39,7 +39,7 @@
 
 ## ひとつのデータ、5つの入口
 
-すべての入口は同じローカルファイル（`$DSH_HOME/integrations/dsh-myinfo/data.json`、パーミッション 0600 —— 端末の外に出ることはありません）を読み書きします：
+すべての入口は 1 つの JSON dossier を読み書きします（デフォルトは `$DSH_HOME/integrations/dsh-myinfo/data.json`、パーミッション 0600。プラグイン設定 `dataFile` で別パス——例えば agentfs/JuiceFS マウント——に変更すれば生データがクラウド同期されます）：
 
 - **エージェントツール** — `personal_identity` / `personal_career` / `personal_relations` / `personal_reflections` / `personal_assets`。チャットから直接記録・照会
 - **`personal_context`** — 1 回の呼び出しで個人コンテキストの摘要（身元・現職・周囲の人・最新の気づき・資産合計と主要保有銘柄）を取得し、会話中にリアルタイムで背景を把握

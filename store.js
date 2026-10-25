@@ -25,9 +25,33 @@ export class StoreError extends Error {
 	}
 }
 
-export function dataFile() {
+/** 可配置的数据文件位置（插件 Config.dataFile，volatile 热更新）。 */
+let configuredDataFile = '';
+export function setDataFile(path) {
+	configuredDataFile = typeof path === 'string' && path.trim() !== '' ? path.trim() : '';
+}
+function legacyDataFile() {
 	const home = process.env.DSH_HOME ?? join(homedir(), '.dsh');
 	return join(home, 'integrations', 'dsh-myinfo', 'data.json');
+}
+/** 数据文件解析：显式 env 覆盖（测试/CLI）> 插件配置（如 agentfs/JuiceFS 同步目录）> 默认 $DSH_HOME。 */
+export function dataFile() {
+	if (process.env.DSH_MYINFO_DATA) return process.env.DSH_MYINFO_DATA;
+	if (configuredDataFile) return configuredDataFile;
+	return legacyDataFile();
+}
+/** 配置了新位置且旧默认文件存在而目标不存在：迁移内容并把旧文件改名 .migrated 兜底。 */
+export function migrateToConfiguredFile() {
+	if (!configuredDataFile || process.env.DSH_MYINFO_DATA) return false;
+	const target = configuredDataFile;
+	if (existsSync(target)) return false;
+	const legacy = legacyDataFile();
+	if (!existsSync(legacy)) return false;
+	mkdirSync(dirname(target), { recursive: true, mode: 0o700 });
+	writeFileSync(target, readFileSync(legacy, 'utf8'), { mode: 0o600 });
+	chmodSync(target, 0o600);
+	renameSync(legacy, legacy + '.migrated');
+	return true;
 }
 
 // ---------------------------------------------------------------------------

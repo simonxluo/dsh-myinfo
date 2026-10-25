@@ -39,7 +39,7 @@
 
 ## One data source, five surfaces
 
-Everything reads and writes the same local file (`$DSH_HOME/integrations/dsh-myinfo/data.json`, mode 0600 — it never leaves your machine):
+Everything reads and writes one JSON dossier (default `$DSH_HOME/integrations/dsh-myinfo/data.json`, mode 0600; set the plugin config `dataFile` to relocate it — e.g. onto an agentfs/JuiceFS mount, which syncs the raw data to cloud storage):
 
 - **Agent tools** — `personal_identity` / `personal_career` / `personal_relations` / `personal_reflections` / `personal_assets`; record and query straight from chat
 - **`personal_context`** — one call returns the whole personal-context digest (identity, current job, key relations, latest reflection, asset totals with top holdings), so the agent picks up your background in real time during a conversation
@@ -61,7 +61,7 @@ dsh plugin --profile web add dsh-myinfo
 
 ## Privacy
 
-The repository itself ships **no personal data**; runtime data lives only under `$DSH_HOME`, and local files excluded by `.gitignore` never enter version control.
+The repository itself ships **no personal data**; runtime data lives under `$DSH_HOME` by default (relocated only if you configure `dataFile` — a synced mount is your explicit choice), and local files excluded by `.gitignore` never enter version control.
 
 ## Documentation
 
