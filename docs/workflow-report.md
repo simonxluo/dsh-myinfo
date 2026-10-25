@@ -93,3 +93,13 @@ workflow 之后的真机端到端（直接调用注册后的 `personal_*` 工具
 - **根因**：v0.4.0 新增 dock 表面时从未被视觉验证——校验页 surface 不含 dock，且桩 ctx 不提供 `sidebarRightTabs` 服务，dock 注册分支在所有验证中都被跳过。
 - **修复**：统计网格只放统计卡；空态与按钮各自独立成行。全仓审计其余 `.dmi-stats/.dmi-grid` 容器子元素均合规（仅此一处违例）。
 - **验证补口**：校验页新增 `surface=dock`（含 320px 窄列模拟 + sidebarRightTabs 桩），realhost 深色模式截图确认布局正确；单测全绿。
+
+## 8. v0.5.0 三处真实宿主回归修复（2026-10-25）
+
+真实应用反馈：三个插件侧栏标签行高低不齐、☀️/🌙 切换「点了没反应」。harness 计算样式取证发现：
+
+1. **CSS 缺分号（v0.4.1 回归）**：`--dmi-bg-elev:...))` 与 `--dmi-shadow:` 两行拼接少 `;`，自定义属性把下一条声明整段吞进值里 → 真实应用所有卡片背景透明、大阴影未定义（`DIAG card-bg=rgba(0,0,0,0)`、`--dmi-shadow=""`）。补分号修复。
+2. **手动主题切换双重失效**：① `.dmi-dark` 只换兜底字面量，真实宿主 body 上永远有 dsw 变量 → 视觉恒定；② 面板组件不订阅主题变化，点击只重渲染按钮自身。改为三层 token：`auto-dark`（dsw 链跟随宿主）/ `force-light` / `force-dark`（纯字面量真实覆盖，页面表面补底色）；新增 `useThemeTick()` 让 Section/Panel/Dock/Overlay 全部响应切换；按钮三态化（🌗 自动 → ☀️ 浅色 → 🌙 深色，title 提示当前态与次态）。harness 实测：dsw=dark 环境点击后 class `dmi-force-light`（bg 255,255,255,.96）→ `dmi-force-dark`（bg 30,30,35,.97）。
+3. **刷新无反馈**：`load()` 现置 busy，四处刷新按钮显示瞬时「…」并短暂禁用。
+
+侧栏标签修复（另两仓库）：dsh-ssh-manager v1.1.1 与 @local/easy2learn-panel v1.0.1 的 `sidebar.panellist` occupant 由 36×36 嵌套 `<button>`（非法 HTML，宿主行 min-height 36px+padding 7px 被撑到 ~50px）改为按宿主 `props.size`（16/18）渲染的纯 SVG；宿主 PanelRow 自带点击处理。harness 以宿主真实 kB3qhq_* 规则复验：四行行高 `[36,36,36,36]`、无嵌套按钮、图标不超标。

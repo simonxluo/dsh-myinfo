@@ -157,5 +157,26 @@ if (!clientSrc.includes('snap.active.colorScheme')) {
 }
 if (clientSrc.includes('--dmi-bg-opaque')) throw new Error('dead token --dmi-bg-opaque should be removed');
 
+// --- v0.5.0 主题三态回归 ---
+// ① 缺分号回归：自定义属性值会吞掉下一条声明（v0.4.1 曾让所有卡片背景失效）。
+if (/\)\)--dmi-shadow/.test(clientSrc)) throw new Error('missing semicolon: declaration swallowed by previous custom property');
+// ② 自动模式跟随宿主（dsw 链），手动覆盖用字面量（force 类不引用 dsw 变量）。
+if (!clientSrc.includes('.dmi-scope.dmi-auto-dark{')) throw new Error('auto-dark scope class missing');
+if (clientSrc.includes('.dmi-scope.dmi-dark{')) throw new Error('legacy dmi-dark class should be renamed');
+const forceDarkBlock = clientSrc.slice(clientSrc.indexOf('.dmi-scope.dmi-force-dark{')).split('}')[0];
+if (forceDarkBlock.includes('var(--dsw-alias')) throw new Error('force-dark must use literals (no dsw chain) to override the real host');
+const autoDarkBlock = clientSrc.slice(clientSrc.indexOf('.dmi-scope.dmi-auto-dark{')).split('}')[0];
+if (!autoDarkBlock.includes('var(--dsw-alias')) throw new Error('auto-dark must follow host dsw tokens');
+// ③ scopeClassOf 三态：手动优先、自动跟随。
+if (!clientSrc.includes('function scopeClassOf(ctx)')) throw new Error('scopeClassOf missing');
+if (!clientSrc.includes('" dmi-force-dark"') || !clientSrc.includes('" dmi-force-light"') || !clientSrc.includes('" dmi-auto-dark"')) {
+	throw new Error('scopeClassOf must map manual/auto modes to force/auto classes');
+}
+// ④ 三态循环 + 刷新 busy 反馈。
+if (!clientSrc.includes('"theme.auto"') || !clientSrc.includes('"theme.next"')) throw new Error('three-state theme locale keys missing');
+if (!clientSrc.includes('busy, onClick: load')) throw new Error('refresh buttons should reflect busy state');
+// ⑤ 侧栏图标回归提示：occupant 不应再包按钮（宿主 PanelRow 已是按钮）。
+if (/"dmi-scope dmi-dockpage" \+ scopeClassOf/.test(clientSrc) === false) throw new Error('dock scope should carry dmi-dockpage marker');
+
 rmSync(dir, { recursive: true, force: true });
 console.log('ALL HOST TESTS PASSED (incl. audit regressions)');

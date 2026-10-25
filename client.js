@@ -87,8 +87,7 @@ zh: {
 	"f.mask": "尾号/标识", "f.balance": "余额", "f.currency": "币种",
 	"f.account": "归属账户", "f.code": "代码", "f.market": "市场", "f.shares": "股数", "f.costPrice": "成本价", "f.price": "现价",
 	"panel.title": "个人档案",
-	"theme.toDark": "切换深色外观",
-	"theme.toLight": "切换浅色外观",
+	"theme.auto": "外观：跟随应用", "theme.light": "外观：浅色", "theme.dark": "外观：深色", "theme.next": " · 点击切换到",
 	"dock.title": "个人档案",
 	"dock.dock": "在右侧停靠",
 	"dock.identity": "基本资料",
@@ -135,8 +134,7 @@ en: {
 	"f.mask": "Mask", "f.balance": "Balance", "f.currency": "Currency",
 	"f.account": "Account", "f.code": "Code", "f.market": "Market", "f.shares": "Shares", "f.costPrice": "Cost", "f.price": "Price",
 	"panel.title": "Profile",
-	"theme.toDark": "Switch to dark appearance",
-	"theme.toLight": "Switch to light appearance",
+	"theme.auto": "Appearance: follow app", "theme.light": "Appearance: light", "theme.dark": "Appearance: dark", "theme.next": " · click to switch to ",
 	"dock.title": "Profile",
 	"dock.dock": "Dock to right",
 	"dock.identity": "Identity",
@@ -181,21 +179,40 @@ async function api(action, payload) {
 // ---------------------------------------------------------------------------
 
 // Apple 设计语言：SF 字体栈、毛玻璃材质、hairline 分隔、大圆角、克制动效。
-// 颜色 token 双层结构：宿主 --dsw-alias-* 变量优先（宿主切主题时自动跟随），
-// Apple 色字面量兜底；.dmi-scope / .dmi-scope.dmi-dark 只切换兜底字面量（供无 dsw 变量的环境）。
+// 颜色 token 三层结构：
+//   ① 自动（.dmi-scope / .dmi-scope.dmi-auto-dark）：宿主 --dsw-alias-* 变量优先、
+//      Apple 字面量兜底——跟随宿主主题，深浅两版只是兜底字面量不同；
+//   ② 手动覆盖（.dmi-scope.dmi-force-light / .dmi-force-dark）：纯字面量、不引用
+//      dsw 变量——在真实宿主（body 上永远有 dsw 变量）里也能真正切换外观；
+// 派生 token（--dmi-text-3/-fill/-fill-2）只在基类定义一次，自动跟随被覆盖的基色。
+// 注意：每条声明必须以 ; 结尾——自定义属性的值几乎接受任意 token 流，缺分号会把
+// 下一条声明整个吞进值里（v0.4.1 曾因此让所有卡片背景失效）。
 const STYLE_CSS = ""
 + ".dmi-scope{--dmi-accent:var(--dsw-alias-brand-primary,#007AFF);--dmi-red:var(--dsw-alias-state-error-primary,#FF3B30);--dmi-green:var(--dsw-alias-state-success-primary,#34C759);--dmi-orange:var(--dsw-alias-state-warn-primary,#FF9500);"
 + "--dmi-text:var(--dsw-alias-label-primary,#1d1d1f);--dmi-text-2:var(--dsw-alias-label-secondary,rgba(60,60,67,.66));--dmi-text-3:color-mix(in srgb,var(--dmi-text-2) 62%,transparent);"
 + "--dmi-sep:var(--dsw-alias-border-l1,rgba(0,0,0,.08));--dmi-fill:color-mix(in srgb,var(--dmi-text) 8%,transparent);--dmi-fill-2:color-mix(in srgb,var(--dmi-text) 14%,transparent);"
-+ "--dmi-bg:var(--dsw-alias-bg-overlay,rgba(255,255,255,.72));--dmi-bg-elev:var(--dsw-alias-bg-layer-1,rgba(255,255,255,.88))"
++ "--dmi-bg:var(--dsw-alias-bg-overlay,rgba(255,255,255,.72));--dmi-bg-elev:var(--dsw-alias-bg-layer-1,rgba(255,255,255,.88));"
 + "--dmi-shadow:0 10px 40px rgba(0,0,0,.14),0 2px 10px rgba(0,0,0,.06);--dmi-shadow-sm:0 2px 10px rgba(0,0,0,.08);"
 + "font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','PingFang SC','Helvetica Neue',sans-serif;"
 + "-webkit-font-smoothing:antialiased;color:var(--dmi-text)}"
-+ ".dmi-scope.dmi-dark{--dmi-accent:var(--dsw-alias-brand-primary,#0A84FF);--dmi-red:var(--dsw-alias-state-error-primary,#FF453A);--dmi-green:var(--dsw-alias-state-success-primary,#30D158);--dmi-orange:var(--dsw-alias-state-warn-primary,#FF9F0A);"
-+ "--dmi-text:var(--dsw-alias-label-primary,#f5f5f7);--dmi-text-2:var(--dsw-alias-label-secondary,rgba(235,235,245,.64));--dmi-text-3:color-mix(in srgb,var(--dmi-text-2) 62%,transparent);"
-+ "--dmi-sep:var(--dsw-alias-border-l1,rgba(255,255,255,.12));--dmi-fill:color-mix(in srgb,var(--dmi-text) 8%,transparent);--dmi-fill-2:color-mix(in srgb,var(--dmi-text) 14%,transparent);"
-+ "--dmi-bg:var(--dsw-alias-bg-overlay,rgba(32,32,36,.66));--dmi-bg-elev:var(--dsw-alias-bg-layer-1,rgba(48,48,52,.82))"
+// 自动深色：仍引用宿主 dsw 变量（跟随宿主），仅兜底字面量换深色。
++ ".dmi-scope.dmi-auto-dark{--dmi-accent:var(--dsw-alias-brand-primary,#0A84FF);--dmi-red:var(--dsw-alias-state-error-primary,#FF453A);--dmi-green:var(--dsw-alias-state-success-primary,#30D158);--dmi-orange:var(--dsw-alias-state-warn-primary,#FF9F0A);"
++ "--dmi-text:var(--dsw-alias-label-primary,#f5f5f7);--dmi-text-2:var(--dsw-alias-label-secondary,rgba(235,235,245,.64));"
++ "--dmi-sep:var(--dsw-alias-border-l1,rgba(255,255,255,.12));"
++ "--dmi-bg:var(--dsw-alias-bg-overlay,rgba(32,32,36,.66));--dmi-bg-elev:var(--dsw-alias-bg-layer-1,rgba(48,48,52,.82));"
 + "--dmi-shadow:0 12px 44px rgba(0,0,0,.5),0 2px 12px rgba(0,0,0,.3);--dmi-shadow-sm:0 2px 12px rgba(0,0,0,.35)}"
+// 手动覆盖：字面量直出（不再 var(--dsw-...)），整页表面（dmi-page/dmi-dockpage/dmi-root）补底色。
++ ".dmi-scope.dmi-force-light{--dmi-accent:#007AFF;--dmi-red:#FF3B30;--dmi-green:#34C759;--dmi-orange:#FF9500;"
++ "--dmi-text:#1d1d1f;--dmi-text-2:rgba(60,60,67,.66);--dmi-sep:rgba(0,0,0,.08);"
++ "--dmi-bg:rgba(252,252,253,.94);--dmi-bg-elev:rgba(255,255,255,.96);"
++ "--dmi-shadow:0 10px 40px rgba(0,0,0,.14),0 2px 10px rgba(0,0,0,.06);--dmi-shadow-sm:0 2px 10px rgba(0,0,0,.08)}"
++ ".dmi-scope.dmi-force-dark{--dmi-accent:#0A84FF;--dmi-red:#FF453A;--dmi-green:#30D158;--dmi-orange:#FF9F0A;"
++ "--dmi-text:#f5f5f7;--dmi-text-2:rgba(235,235,245,.64);--dmi-sep:rgba(255,255,255,.12);"
++ "--dmi-bg:rgba(28,28,32,.94);--dmi-bg-elev:rgba(30,30,35,.97);"
++ "--dmi-shadow:0 12px 44px rgba(0,0,0,.5),0 2px 12px rgba(0,0,0,.3);--dmi-shadow-sm:0 2px 12px rgba(0,0,0,.35)}"
++ ".dmi-scope.dmi-force-light.dmi-page,.dmi-scope.dmi-force-dark.dmi-page,"
++ ".dmi-scope.dmi-force-light.dmi-dockpage,.dmi-scope.dmi-force-dark.dmi-dockpage{background:var(--dmi-bg-elev)}"
++ ".dmi-scope.dmi-force-light .dmi-root,.dmi-scope.dmi-force-dark .dmi-root{background:var(--dmi-bg-elev);border-radius:14px}"
 + ".dmi-scope *{box-sizing:border-box}"
 // —— 通用控件：按钮（iOS fill / tinted / plain）、输入、分段控件 ——
 + ".dmi-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:6px 16px;font-size:13px;font-weight:500;border-radius:999px;cursor:pointer;border:none;background:var(--dmi-fill);color:var(--dmi-text);transition:background .18s,transform .12s,opacity .18s;white-space:nowrap;font-family:inherit}"
@@ -281,9 +298,12 @@ const STYLE_CSS = ""
 + ".dmi-ov-foot{display:flex;gap:8px;padding:10px 14px 14px;border-top:none}";
 
 
-/** 明暗主题：effectiveDark 判定链（手动 > dsw 亮度实算 > theme id 启发 > 系统偏好）。 */
-function darkClassOf(ctx) {
-	return effectiveDark(ctx) ? " dmi-dark" : "";
+/** 作用域主题类：手动覆盖 → force-*（字面量直出，真实宿主里也真实生效）；
+ * 自动模式 → auto-dark（跟随宿主 dsw 令牌，仅兜底字面量分深浅）。 */
+function scopeClassOf(ctx) {
+	if (manualTheme === "dark") return " dmi-force-dark";
+	if (manualTheme === "light") return " dmi-force-light";
+	return autoDark(ctx) ? " dmi-auto-dark" : "";
 }
 
 
@@ -362,7 +382,7 @@ function parseColorLuminance(css) {
 
 /** 自动明暗判定链：① 宿主 --dsw-alias-bg-base 实算亮度（L < 0.5 判深）
  *  ② theme 服务 id 启发（含 dark 判深；light/day/default 前缀才判浅，未识别 id 不强制浅色）
- *  ③ 系统 prefers-color-scheme。手动开关在 effectiveDark 中优先于本链。 */
+ *  ③ 系统 prefers-color-scheme。手动覆盖（force-*）在 scopeClassOf 中优先于本链。 */
 function autoDark(ctx) {
 	// ① dsw token 实算：宿主把 --dsw-alias-* 定义在 body（body{} 与 body[data-ds-dark-theme]{}，
 	// ThemePresenter 也只写 body.style），自定义属性只向子孙继承，必须读 body 而非 documentElement。
@@ -398,12 +418,18 @@ function autoDark(ctx) {
 	// ③ 系统偏好。
 	return systemDark();
 }
-function effectiveDark(ctx) {
-	if (manualTheme === "dark") return true;
-	if (manualTheme === "light") return false;
-	return autoDark(ctx);
+/** 主题变化时让当前组件重渲染：手动切换要改 scope 类（force-*），
+ * 而 scope 类在 Section/Panel/Dock/Overlay 的根元素上——它们必须订阅主题。 */
+function useThemeTick() {
+	const [, tick] = useState(0);
+	useEffect(() => {
+		const fn = () => tick((v) => v + 1);
+		themeListeners.add(fn);
+		return () => { themeListeners.delete(fn); };
+	}, []);
 }
-/** ☀️/🌙 切换按钮：手动覆盖外观，三处界面共用。 */
+
+/** 外观切换（三态循环 自动→浅色→深色）：自动跟随宿主；手动用字面量覆盖真实生效。 */
 function ThemeToggle(props) {
 	const [, tick] = useState(0);
 	useEffect(() => {
@@ -411,12 +437,16 @@ function ThemeToggle(props) {
 		themeListeners.add(fn);
 		return () => { themeListeners.delete(fn); };
 	}, []);
-	const dark = effectiveDark(props && props.ctx);
+	const mode = manualTheme; // null=自动 | "light" | "dark"
+	const next = mode === null ? "light" : mode === "light" ? "dark" : null;
+	const cur = mode === "dark" ? t("theme.dark") : mode === "light" ? t("theme.light") : t("theme.auto");
+	const label = cur + t("theme.next") + (next === "dark" ? t("theme.dark") : next === "light" ? t("theme.light") : t("theme.auto"));
 	return h("button", {
 		className: "dmi-btn dmi-btn--sm",
-		title: dark ? t("theme.toLight") : t("theme.toDark"),
-		onClick: () => setManualTheme(dark ? "light" : "dark"),
-	}, dark ? "☀️" : "🌙");
+		title: label,
+		"aria-label": label,
+		onClick: () => setManualTheme(next),
+	}, mode === "dark" ? "🌙" : mode === "light" ? "☀️" : "🌗");
 }
 
 // ---------------------------------------------------------------------------
@@ -430,6 +460,7 @@ function useMyInfoData() {
 	const alive = useRef(true);
 	useEffect(() => () => { alive.current = false; }, []);
 	const load = useCallback(async () => {
+		setBusy(true);
 		try {
 			const value = await api(undefined);
 			if (!alive.current) return;
@@ -437,6 +468,8 @@ function useMyInfoData() {
 			setError("");
 		} catch (err) {
 			if (alive.current) setError(t("error.load") + String(err && err.message ? err.message : err));
+		} finally {
+			if (alive.current) setBusy(false);
 		}
 	}, []);
 	const post = useCallback(async (action, payload) => {
@@ -913,6 +946,7 @@ function TabBody(tab, tabProps) {
 /** 设置页里的「个人信息」区块（settings.section）。 */
 function MyInfoSection(props, ctx) {
 	const [, setLangTick] = useState(0);
+	useThemeTick();
 	const [tab, setTab] = useState("identity");
 	const { view, error, busy, load, post } = useMyInfoData();
 	useEffect(() => {
@@ -922,12 +956,12 @@ function MyInfoSection(props, ctx) {
 	useEffect(() => { load(); }, [load]);
 	const tabProps = { view, post, busy };
 	ensureStyle();
-	return h("div", { className: "dmi-scope" + darkClassOf(ctx) },
+	return h("div", { className: "dmi-scope" + scopeClassOf(ctx) },
 		h("div", { className: "dmi-root" },
 			h("div", { className: "dmi-head" },
 				h("h3", null, t("title")),
 				view && view.meta ? h("span", { className: "dmi-updated" }, t("hint.updatedAt") + "：" + String(view.meta.updatedAt || "").replace("T", " ").slice(0, 19)) : null,
-				h(Btn, { size: "sm", onClick: load }, t("action.refresh")),
+				h(Btn, { size: "sm", busy, onClick: load }, t("action.refresh")),
 				h(ThemeToggle, { ctx })),
 			h("div", { className: "dmi-sub" }, t("subtitle")),
 			error ? h("div", { className: "dmi-error" }, error) : null,
@@ -948,6 +982,7 @@ function MyInfoIcon(props) {
 /** 中央主面板（main keyed slot，id=myinfo）：Apple 风整页档案。 */
 function MyInfoPanel(props, ctx) {
 	const [, setLangTick] = useState(0);
+	useThemeTick();
 	const [tab, setTab] = useState("identity");
 	const { view, error, busy, load, post } = useMyInfoData();
 	useEffect(() => {
@@ -960,7 +995,7 @@ function MyInfoPanel(props, ctx) {
 	const grand = totals.CNY ? totals.CNY.grand : null;
 	const who = [id.name, id.age !== null && id.age !== undefined ? id.age + " 岁" : "", id.residence].filter(Boolean).join(" · ");
 	ensureStyle();
-	return h("div", { className: "dmi-scope dmi-page" + darkClassOf(ctx) },
+	return h("div", { className: "dmi-scope dmi-page" + scopeClassOf(ctx) },
 		h("div", { className: "dmi-page-head" },
 			h("div", { style: { flex: 1, minWidth: 220 } },
 				h("h2", { className: "dmi-page-title" }, t("panel.title")),
@@ -971,7 +1006,7 @@ function MyInfoPanel(props, ctx) {
 					if (r && typeof r.openTab === "function") r.openTab(DOCK_KIND, { params: {} });
 				} catch (e) { /* 右栏服务不可用则忽略 */ }
 			} }, t("dock.dock")),
-			h(Btn, { size: "sm", onClick: load }, t("action.refresh")),
+			h(Btn, { size: "sm", busy, onClick: load }, t("action.refresh")),
 			h(ThemeToggle, { ctx }),
 			grand !== null ? h(Chip, { tone: "money", title: t("stat.grand") }, fmtMoney(grand)) : null),
 		h("div", { className: "dmi-seg", style: { marginBottom: 16 } }, TAB_KEYS.map((key) =>
@@ -983,7 +1018,8 @@ function MyInfoPanel(props, ctx) {
 
 /** 资产速览浮窗（shell.overlay）：右下角胶囊 ↔ 毛玻璃速览卡。 */
 function AssetOverlay(props, ctx) {
-	const { view, load } = useMyInfoData();
+	const { view, busy, load } = useMyInfoData();
+	useThemeTick();
 	const [expanded, setExpanded] = useState(false);
 	useEffect(() => { load(); }, [load]);
 	// 每分钟静默刷新一次（浮窗常驻，最新余额很重要）
@@ -996,7 +1032,7 @@ function AssetOverlay(props, ctx) {
 	const totals = (assets.totals && assets.totals.totals) || {};
 	const cny = totals.CNY || null;
 	const hasData = cny !== null || (assets.accounts || []).length > 0;
-	const dark = darkClassOf(ctx);
+	const themeClass = scopeClassOf(ctx);
 	const openPanel = () => {
 		try {
 			const layout = serviceOf(ctx, "layout");
@@ -1004,7 +1040,7 @@ function AssetOverlay(props, ctx) {
 		} catch (e) { /* 布局服务不可用则忽略 */ }
 	};
 	if (!expanded) {
-		return h("div", { className: "dmi-scope dmi-ov" + dark },
+		return h("div", { className: "dmi-scope dmi-ov" + themeClass },
 			h("div", {
 				className: "dmi-ov-pill", title: t("ov.title"),
 				onClick: () => { if (hasData) setExpanded(true); else openPanel(); },
@@ -1018,7 +1054,7 @@ function AssetOverlay(props, ctx) {
 		["📈", t("stat.stock"), cny.stock],
 		["💎", t("stat.holdings"), cny.holdings],
 	] : [];
-	return h("div", { className: "dmi-scope dmi-ov" + dark },
+	return h("div", { className: "dmi-scope dmi-ov" + themeClass },
 		h("div", { className: "dmi-ov-card" },
 			h("div", { className: "dmi-ov-head" },
 				h("span", { className: "dmi-ov-title" }, t("ov.title")),
@@ -1034,7 +1070,7 @@ function AssetOverlay(props, ctx) {
 					h("span", { className: "dmi-ov-row-val" }, fmtMoney(val))))),
 			h("div", { className: "dmi-ov-foot" },
 				h(Btn, { size: "sm", variant: "primary", onClick: openPanel }, t("ov.open")),
-				h(Btn, { size: "sm", onClick: load }, t("action.refresh")))));
+				h(Btn, { size: "sm", busy, onClick: load }, t("action.refresh")))));
 }
 
 
@@ -1047,8 +1083,9 @@ const DOCK_KIND = "myinfo.profile";  // openTab 的 kind
 
 /** 窄列档案摘要：基本资料 + 资产速览 + 跳转完整档案。 */
 function MyInfoDock(props, ctx) {
-	const { view, error, load } = useMyInfoData();
+	const { view, error, busy, load } = useMyInfoData();
 	const [, tick] = useState(0);
+	useThemeTick();
 	useEffect(() => {
 		relocalize = () => tick((v) => v + 1);
 		return () => { relocalize = null; };
@@ -1059,12 +1096,12 @@ function MyInfoDock(props, ctx) {
 	const cny = ((assets.totals && assets.totals.totals) || {}).CNY || null;
 	const who = [id.name || "—", id.age !== null && id.age !== undefined ? id.age + " 岁" : "", id.residence].filter(Boolean).join(" · ");
 	ensureStyle();
-	return h("div", { className: "dmi-scope" + darkClassOf(ctx), style: { padding: "16px 14px", display: "flex", flexDirection: "column", gap: 12, minHeight: "100%" } },
+	return h("div", { className: "dmi-scope dmi-dockpage" + scopeClassOf(ctx), style: { padding: "16px 14px", display: "flex", flexDirection: "column", gap: 12, minHeight: "100%" } },
 		h("div", { className: "dmi-head" },
 			h("h3", { style: { margin: 0, fontSize: 16 } }, t("dock.title")),
 			h("div", { style: { marginLeft: "auto", display: "flex", gap: 6 } },
 				h(ThemeToggle, { ctx }),
-				h(Btn, { size: "sm", onClick: load }, t("action.refresh")))),
+				h(Btn, { size: "sm", busy, onClick: load }, t("action.refresh")))),
 		error ? h("div", { className: "dmi-error" }, error) : null,
 		view === null && error === "" ? h("div", { className: "dmi-empty" }, "…") : h("div", { style: { display: "flex", flexDirection: "column", gap: 12 } },
 			h("div", { className: "dmi-card" },
