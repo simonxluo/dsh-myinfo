@@ -132,6 +132,20 @@ const addRender = await career.execute({ action: 'add', entry: { company: 'R公�
 const renderedAdd = (await career.output.render)({}, addRender);
 if (!renderedAdd[0].text.includes('R公司')) throw new Error('render should unwrap wrapper output');
 
+// --- v0.6.0 personal_context：一次调用拿全对话上下文 ---
+const contextTool = byName.get('personal_context');
+const digest = await contextTool.execute({});
+equal(digest.identity.name, '张三', 'digest carries identity');
+equal(digest.currentJob.company, 'R公司', 'digest picks the current job');
+equal(digest.careerCount, 4, 'digest counts career entries (incl. watermark-test leftover W3)');
+equal(digest.relationCount, 1, 'digest counts relations');
+equal(digest.latestReflection.date, '2025-01-10', 'digest latest reflection');
+equal(typeof digest.assets.totals.CNY, 'object', 'digest asset totals');
+const digestText = (await contextTool.output.render)({}, digest).map((x) => x.text).join('\n');
+if (!digestText.includes('张三') || !digestText.includes('R公司') || !digestText.includes('个人上下文')) {
+	throw new Error('personal_context render should mention identity, current job and the title');
+}
+
 // --- v0.4.x 主题修复回归：parseColorLuminance + autoDark 关键结构 ---
 import { readFileSync as _rf } from 'node:fs';
 const clientSrc = _rf(new URL('../client.js', import.meta.url), 'utf8');
@@ -177,6 +191,13 @@ if (!clientSrc.includes('"theme.auto"') || !clientSrc.includes('"theme.next"')) 
 if (!clientSrc.includes('busy, onClick: load')) throw new Error('refresh buttons should reflect busy state');
 // ⑤ 侧栏图标回归提示：occupant 不应再包按钮（宿主 PanelRow 已是按钮）。
 if (/"dmi-scope dmi-dockpage" \+ scopeClassOf/.test(clientSrc) === false) throw new Error('dock scope should carry dmi-dockpage marker');
+
+// --- v0.6.0 卡片式主面板回归 ---
+if (!clientSrc.includes('function DomainCard(props)')) throw new Error('DomainCard missing');
+if (!clientSrc.includes('"dmi-cards"')) throw new Error('card grid missing');
+if (!clientSrc.includes('dmi-detail-head')) throw new Error('detail head missing');
+if (!clientSrc.includes('const [page, setPage] = useState(null)')) throw new Error('panel page state missing');
+if (!clientSrc.includes('onOpen: () => setPage(key)')) throw new Error('cards should navigate into the detail page');
 
 rmSync(dir, { recursive: true, force: true });
 console.log('ALL HOST TESTS PASSED (incl. audit regressions)');

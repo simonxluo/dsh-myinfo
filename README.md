@@ -6,7 +6,7 @@
 
 **A local-first personal dossier for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) — who I am, what I've done, who's around me, what I've figured out, and what I own.**
 
-[![version](https://img.shields.io/badge/version-0.5.0-0071e3)](https://github.com/simonxluo/dsh-myinfo/releases)
+[![version](https://img.shields.io/badge/version-0.6.0-0071e3)](https://github.com/simonxluo/dsh-myinfo/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-34c759)](https://github.com/simonxluo/dsh-myinfo/blob/main/LICENSE)
 [![DeepSeek Harness](https://img.shields.io/badge/DeepSeek_Harness-%E2%89%A5_0.2.1--rc.1-8957e5)](https://github.com/deepseek-ai/deepseek-harness)
 [![platform](https://img.shields.io/badge/platform-Web_%7C_Desktop-8E8E93)](https://github.com/simonxluo/dsh-myinfo)
@@ -42,7 +42,8 @@
 Everything reads and writes the same local file (`$DSH_HOME/integrations/dsh-myinfo/data.json`, mode 0600 — it never leaves your machine):
 
 - **Agent tools** — `personal_identity` / `personal_career` / `personal_relations` / `personal_reflections` / `personal_assets`; record and query straight from chat
-- **Main panel** (Apple aesthetic) — the sidebar Profile icon opens a full-page dossier with a hero header and a segmented control across the five domains
+- **`personal_context`** — one call returns the whole personal-context digest (identity, current job, key relations, latest reflection, asset totals with top holdings), so the agent picks up your background in real time during a conversation
+- **Main panel** (Apple aesthetic, card dashboard) — the sidebar Profile icon opens a card grid: each domain is a card with its summary up front; click a card to dive into the full detail page (back capsule to return)
 - **Asset overlay** — a frosted pill in the bottom-right corner shows your net total; click it for a quick card and a one-tap jump to the panel; refreshes itself every minute
 - **Right dock** — a compact profile digest docked into the session's right pane (「Dock to right」 on the main panel, or the dock's guide page)
 - **Settings section** — DSH settings → Personal Info, sharing the same five-domain forms

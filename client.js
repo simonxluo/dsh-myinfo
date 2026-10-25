@@ -91,6 +91,15 @@ zh: {
 	"dock.title": "个人档案",
 	"dock.dock": "在右侧停靠",
 	"dock.identity": "基本资料",
+	"card.empty": "暂无记录",
+	"card.identity.hint": "姓名 / 年龄 / 现居",
+	"card.career.count": "段工作经历",
+	"card.career.current": "在职",
+	"card.relations.count": "位联系人",
+	"card.reflections.count": "条感悟",
+	"card.accounts": "个账户",
+	"card.holdings": "项持仓",
+	"card.since": "起",
 	"ov.title": "资产速览",
 	"ov.open": "打开完整档案",
 	"ov.empty": "暂无资产 · 点击录入",
@@ -138,6 +147,15 @@ en: {
 	"dock.title": "Profile",
 	"dock.dock": "Dock to right",
 	"dock.identity": "Identity",
+	"card.empty": "No records yet",
+	"card.identity.hint": "name / age / residence",
+	"card.career.count": "positions",
+	"card.career.current": "current",
+	"card.relations.count": "people",
+	"card.reflections.count": "entries",
+	"card.accounts": "accounts",
+	"card.holdings": "holdings",
+	"card.since": "since",
 	"ov.title": "Assets",
 	"ov.open": "Open full profile",
 	"ov.empty": "No assets yet",
@@ -295,7 +313,32 @@ const STYLE_CSS = ""
 + ".dmi-ov-row-ico{width:30px;height:30px;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;font-size:14px;background:var(--dmi-fill);flex:none}"
 + ".dmi-ov-row-label{flex:1;font-size:13px;font-weight:500}"
 + ".dmi-ov-row-val{font-size:13px;font-weight:600;font-variant-numeric:tabular-nums}"
-+ ".dmi-ov-foot{display:flex;gap:8px;padding:10px 14px 14px;border-top:none}";
++ ".dmi-ov-foot{display:flex;gap:8px;padding:10px 14px 14px;border-top:none}"
+// —— 卡片式仪表盘（主面板：卡片外层摘要，点入域详情）——
++ ".dmi-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(236px,1fr));gap:14px;margin:2px 0 10px}"
++ ".dmi-cardnav{display:flex;align-items:center;gap:12px;padding:14px 15px;border:1px solid var(--dmi-sep);border-radius:16px;background:var(--dmi-bg-elev);box-shadow:var(--dmi-shadow-sm);cursor:pointer;text-align:left;font-family:inherit;color:var(--dmi-text);transition:transform .2s cubic-bezier(.25,.1,.25,1),box-shadow .2s;-webkit-tap-highlight-color:transparent}"
++ ".dmi-cardnav:hover{transform:translateY(-2px);box-shadow:var(--dmi-shadow)}"
++ ".dmi-cardnav:active{transform:scale(.975)}"
++ ".dmi-cardnav:focus-visible{outline:2px solid var(--dmi-accent);outline-offset:2px}"
++ ".dmi-cardnav-ico{width:40px;height:40px;border-radius:11px;flex:none;display:inline-flex;align-items:center;justify-content:center;color:#fff}"
++ ".dmi-ico-identity{background:linear-gradient(160deg,#0A84FF,#0055D7)}"
++ ".dmi-ico-career{background:linear-gradient(160deg,#FF9F0A,#FF6A00)}"
++ ".dmi-ico-relations{background:linear-gradient(160deg,#FF375F,#D70015)}"
++ ".dmi-ico-reflections{background:linear-gradient(160deg,#BF5AF2,#8944AB)}"
++ ".dmi-ico-assets{background:linear-gradient(160deg,#30D158,#0E9F13)}"
++ ".dmi-cardnav-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}"
++ ".dmi-cardnav-title{font-size:13px;font-weight:600;color:var(--dmi-text-2);letter-spacing:-.1px}"
++ ".dmi-cardnav-stat{font-size:15px;font-weight:700;letter-spacing:-.3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}"
++ ".dmi-cardnav-stat.is-empty{color:var(--dmi-text-3);font-weight:500;font-size:13.5px}"
++ ".dmi-cardnav-sub{font-size:12px;color:var(--dmi-text-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}"
++ ".dmi-cardnav-chev{flex:none;color:var(--dmi-text-3);font-size:18px;line-height:1}"
++ ".dmi-detail-head{display:flex;align-items:center;gap:12px;margin-bottom:8px;flex-wrap:wrap;animation:dmi-detail-in .26s cubic-bezier(.25,.1,.25,1)}"
++ ".dmi-back{display:inline-flex;align-items:center;gap:3px;padding:6px 13px 6px 9px;border-radius:999px;border:none;background:var(--dmi-fill);color:var(--dmi-text);cursor:pointer;font:inherit;font-size:13px;font-weight:600;transition:background .18s,transform .12s}"
++ ".dmi-back:hover{background:var(--dmi-fill-2)}"
++ ".dmi-back:active{transform:scale(.96)}"
++ ".dmi-detail-title{font-size:27px;font-weight:750;letter-spacing:-.7px;flex:1;min-width:0;margin:0}"
++ ".dmi-detail-body{animation:dmi-detail-in .3s cubic-bezier(.25,.1,.25,1)}"
++ "@keyframes dmi-detail-in{from{opacity:0;transform:translateX(26px)}to{opacity:1;transform:none}}";
 
 
 /** 作用域主题类：手动覆盖 → force-*（字面量直出，真实宿主里也真实生效）；
@@ -979,11 +1022,101 @@ function MyInfoIcon(props) {
 		h("path", { d: "M5 19.4c1-3.6 3.8-5.4 7-5.4s6 1.8 7 5.4", stroke: "currentColor", strokeWidth: 2.2, strokeLinecap: "round" }));
 }
 
-/** 中央主面板（main keyed slot，id=myinfo）：Apple 风整页档案。 */
+/** iOS 设置风格的域图形（白色 SF Symbols 风，画在渐变圆角方块里）。 */
+const CARD_ICONS = {
+	identity: (size) => h("svg", { width: size, height: size, viewBox: "0 0 24 24", fill: "none", "aria-hidden": true },
+		h("circle", { cx: 12, cy: 8, r: 3.5, fill: "currentColor" }),
+		h("path", { d: "M5.2 19.6c1.1-3.7 3.9-5.5 6.8-5.5s5.7 1.8 6.8 5.5", stroke: "currentColor", strokeWidth: 2.3, strokeLinecap: "round" })),
+	career: (size) => h("svg", { width: size, height: size, viewBox: "0 0 24 24", fill: "none", "aria-hidden": true },
+		h("rect", { x: 3.2, y: 7.3, width: 17.6, height: 12.2, rx: 3.2, stroke: "currentColor", strokeWidth: 1.9 }),
+		h("path", { d: "M9 7.3V6.1A2.1 2.1 0 0 1 11.1 4h1.8A2.1 2.1 0 0 1 15 6.1v1.2", stroke: "currentColor", strokeWidth: 1.9, strokeLinecap: "round" }),
+		h("path", { d: "M3.2 12.7h17.6", stroke: "currentColor", strokeWidth: 1.6 })),
+	relations: (size) => h("svg", { width: size, height: size, viewBox: "0 0 24 24", fill: "none", "aria-hidden": true },
+		h("circle", { cx: 9, cy: 8.2, r: 3.4, fill: "currentColor" }),
+		h("path", { d: "M3 19.5c1-3.5 3.4-5.2 6-5.2s5 1.7 6 5.2", stroke: "currentColor", strokeWidth: 2.2, strokeLinecap: "round" }),
+		h("circle", { cx: 16.8, cy: 9, r: 2.5, fill: "currentColor", opacity: 0.55 }),
+		h("path", { d: "M15.8 14.6c2.6.2 4.6 1.9 5.4 4.9", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", opacity: 0.55 })),
+	reflections: (size) => h("svg", { width: size, height: size, viewBox: "0 0 24 24", fill: "none", "aria-hidden": true },
+		h("path", { d: "M12 4.5a5.3 5.3 0 0 0-3.2 9.6c.6.5 1 1.2 1.1 2l.1.9h4l.1-.9c.1-.8.5-1.5 1.1-2A5.3 5.3 0 0 0 12 4.5Z", fill: "currentColor" }),
+		h("path", { d: "M10.2 19.4h3.6", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" })),
+	assets: (size) => h("svg", { width: size, height: size, viewBox: "0 0 24 24", fill: "none", "aria-hidden": true },
+		h("path", { d: "M6.5 5.5 12 12l5.5-6.5", stroke: "currentColor", strokeWidth: 2.2, strokeLinecap: "round", strokeLinejoin: "round" }),
+		h("path", { d: "M12 12v6.5", stroke: "currentColor", strokeWidth: 2.2, strokeLinecap: "round" }),
+		h("path", { d: "M8.3 12h7.4M8.3 15.2h7.4", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round" })),
+};
+
+/** 渐变圆角方块图标（iOS 应用心智）。 */
+function CardIcon(props) {
+	const domain = props.domain || "identity";
+	const size = props.size || 22;
+	const icon = CARD_ICONS[domain] || CARD_ICONS.identity;
+	return h("span", { className: "dmi-cardnav-ico dmi-ico-" + domain, "aria-hidden": true },
+		icon(size)); // 直接调用工厂拿元素；经 h() 传函数会被当组件、props 对象会变成 width
+}
+
+/** 卡片摘要：每个域一行主摘要（stat）+ 一行次要说明（sub）。 */
+function domainSummary(domain, view) {
+	const id = view.identity || {};
+	const career = view.career || [];
+	const relations = view.relations || [];
+	const reflections = view.reflections || [];
+	const assets = view.assets || { accounts: [], holdings: [], totals: { totals: {} } };
+	const totals = (assets.totals && assets.totals.totals) || {};
+	const primary = totals.CNY || Object.values(totals)[0] || null;
+	if (domain === "identity") {
+		const stat = [id.name, id.age !== null && id.age !== undefined ? id.age + " 岁" : ""].filter(Boolean).join(" · ");
+		return { stat: stat || t("card.empty"), sub: id.residence || t("card.identity.hint"), empty: stat === "" };
+	}
+	if (domain === "career") {
+		const cur = career.find((x) => x.current);
+		const count = career.length + " " + t("card.career.count");
+		if (cur) return { stat: cur.title + " · " + cur.company, sub: cur.startDate + " " + t("card.since") + " · " + t("card.career.current") + " · " + count, empty: false };
+		return {
+			stat: career.length > 0 ? career[0].title + " · " + career[0].company : t("card.empty"),
+			sub: count, empty: career.length === 0,
+		};
+	}
+	if (domain === "relations") {
+		const names = relations.slice(0, 2).map((x) => x.name).join(" · ");
+		return { stat: names || t("card.empty"), sub: relations.length + " " + t("card.relations.count"), empty: relations.length === 0 };
+	}
+	if (domain === "reflections") {
+		const latest = reflections[0];
+		const count = reflections.length + " " + t("card.reflections.count");
+		return {
+			stat: latest ? (latest.title || String(latest.content || "").replace(/\s+/g, " ").slice(0, 18)) : t("card.empty"),
+			sub: latest ? latest.date + " · " + count : count,
+			empty: !latest,
+		};
+	}
+	if (domain === "assets") {
+		return {
+			stat: primary ? fmtMoney(primary.grand) : t("card.empty"),
+			sub: (assets.accounts || []).length + " " + t("card.accounts") + " · " + (assets.holdings || []).length + " " + t("card.holdings"),
+			empty: !primary && (assets.accounts || []).length === 0,
+		};
+	}
+	return { stat: "", sub: "", empty: true };
+}
+
+/** 卡片网格里的域卡片：图标 + 摘要 + ›，点击进域详情。 */
+function DomainCard(props) {
+	const sum = domainSummary(props.domain, props.view);
+	return h("button", { type: "button", className: "dmi-cardnav", onClick: props.onOpen,
+			"aria-label": t("tab." + props.domain) },
+		h(CardIcon, { domain: props.domain }),
+		h("span", { className: "dmi-cardnav-body" },
+			h("span", { className: "dmi-cardnav-title" }, t("tab." + props.domain)),
+			h("span", { className: "dmi-cardnav-stat" + (sum.empty ? " is-empty" : "") }, sum.stat),
+			h("span", { className: "dmi-cardnav-sub" }, sum.sub)),
+		h("span", { className: "dmi-cardnav-chev", "aria-hidden": true }, "›"));
+}
+
+/** 中央主面板（main keyed slot，id=myinfo）：卡片式仪表盘，点卡片进域详情。 */
 function MyInfoPanel(props, ctx) {
 	const [, setLangTick] = useState(0);
 	useThemeTick();
-	const [tab, setTab] = useState("identity");
+	const [page, setPage] = useState(null); // null = 卡片网格；TAB_KEYS 内的值 = 域详情页
 	const { view, error, busy, load, post } = useMyInfoData();
 	useEffect(() => {
 		relocalize = () => setLangTick((v) => v + 1);
@@ -994,26 +1127,36 @@ function MyInfoPanel(props, ctx) {
 	const totals = view && view.assets && view.assets.totals ? view.assets.totals.totals || {} : {};
 	const grand = totals.CNY ? totals.CNY.grand : null;
 	const who = [id.name, id.age !== null && id.age !== undefined ? id.age + " 岁" : "", id.residence].filter(Boolean).join(" · ");
+	const inDetail = page !== null && TAB_KEYS.indexOf(page) >= 0;
 	ensureStyle();
 	return h("div", { className: "dmi-scope dmi-page" + scopeClassOf(ctx) },
-		h("div", { className: "dmi-page-head" },
-			h("div", { style: { flex: 1, minWidth: 220 } },
-				h("h2", { className: "dmi-page-title" }, t("panel.title")),
-				h("div", { className: "dmi-page-sub" }, who || t("subtitle"))),
-			h(Btn, { size: "sm", onClick: () => {
-				try {
-					const r = serviceOf(ctx, "sidebarRight");
-					if (r && typeof r.openTab === "function") r.openTab(DOCK_KIND, { params: {} });
-				} catch (e) { /* 右栏服务不可用则忽略 */ }
-			} }, t("dock.dock")),
-			h(Btn, { size: "sm", busy, onClick: load }, t("action.refresh")),
-			h(ThemeToggle, { ctx }),
-			grand !== null ? h(Chip, { tone: "money", title: t("stat.grand") }, fmtMoney(grand)) : null),
-		h("div", { className: "dmi-seg", style: { marginBottom: 16 } }, TAB_KEYS.map((key) =>
-			h("button", { key, className: tab === key ? "is-active" : "", onClick: () => setTab(key) }, t("tab." + key)))),
+		inDetail
+			? h("div", { className: "dmi-detail-head" },
+				h("button", { type: "button", className: "dmi-back", onClick: () => setPage(null), "aria-label": t("panel.title") },
+					h("span", { style: { fontSize: 15, lineHeight: 1, marginRight: 2 }, "aria-hidden": true }, "‹"), t("panel.title")),
+				h("h2", { className: "dmi-detail-title" }, t("tab." + page)),
+				h(Btn, { size: "sm", busy, onClick: load }, t("action.refresh")),
+				h(ThemeToggle, { ctx }))
+			: h("div", { className: "dmi-page-head" },
+				h("div", { style: { flex: 1, minWidth: 220 } },
+					h("h2", { className: "dmi-page-title" }, t("panel.title")),
+					h("div", { className: "dmi-page-sub" }, who || t("subtitle"))),
+				h(Btn, { size: "sm", onClick: () => {
+					try {
+						const r = serviceOf(ctx, "sidebarRight");
+						if (r && typeof r.openTab === "function") r.openTab(DOCK_KIND, { params: {} });
+					} catch (e) { /* 右栏服务不可用则忽略 */ }
+				} }, t("dock.dock")),
+				h(Btn, { size: "sm", busy, onClick: load }, t("action.refresh")),
+				h(ThemeToggle, { ctx }),
+				grand !== null ? h(Chip, { tone: "money", title: t("stat.grand") }, fmtMoney(grand)) : null),
 		error ? h("div", { className: "dmi-error" }, error) : null,
 		view === null && error === "" ? h("div", { className: "dmi-empty" }, "…") :
-		view === null ? null : TabBody(tab, { view, post, busy }));
+		view === null ? null :
+		inDetail
+			? h("div", { className: "dmi-detail-body" }, TabBody(page, { view, post, busy }))
+			: h("div", { className: "dmi-cards" }, TAB_KEYS.map((key) =>
+				h(DomainCard, { key, domain: key, view, onOpen: () => setPage(key) }))));
 }
 
 /** 资产速览浮窗（shell.overlay）：右下角胶囊 ↔ 毛玻璃速览卡。 */

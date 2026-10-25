@@ -103,3 +103,7 @@ workflow 之后的真机端到端（直接调用注册后的 `personal_*` 工具
 3. **刷新无反馈**：`load()` 现置 busy，四处刷新按钮显示瞬时「…」并短暂禁用。
 
 侧栏标签修复（另两仓库）：dsh-ssh-manager v1.1.1 与 @local/easy2learn-panel v1.0.1 的 `sidebar.panellist` occupant 由 36×36 嵌套 `<button>`（非法 HTML，宿主行 min-height 36px+padding 7px 被撑到 ~50px）改为按宿主 `props.size`（16/18）渲染的纯 SVG；宿主 PanelRow 自带点击处理。harness 以宿主真实 kB3qhq_* 规则复验：四行行高 `[36,36,36,36]`、无嵌套按钮、图标不超标。
+
+## 9. v0.6.0 卡片式主面板 + personal_context 摘要工具（2026-10-25）
+
+主面板由「分段控件平铺」重构为 Apple 风卡片仪表盘：五域各一张卡（渐变圆角图标 + 主摘要 + 次行说明 + ›），点击进域详情页（返回胶囊 + 大标题 + 弹簧滑入动画），详情复用既有 TabBody 编辑组件。新增 `personal_context` 工具：一次调用返回身份/当前在职/身边的人/最新感悟/资产合计与主要持仓的紧凑摘要及 Markdown 渲染，供对话实时装载用户个人上下文。harness 实测：卡片 ×5、点「工作经历」→ detail-title=工作经历 back=true、返回后 cards=5；修复 CardIcon 把图标工厂当 React 组件传参导致 svg width="[object Object]" 的问题（改为直接调用工厂取元素）。

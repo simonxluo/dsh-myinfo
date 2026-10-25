@@ -1,6 +1,7 @@
 /**
  * dsh-myinfo — agent 工具：personal_identity / personal_career /
- * personal_relations / personal_reflections / personal_assets。
+ * personal_relations / personal_reflections / personal_assets，外加一次性
+ * 摘要工具 personal_context（对话中实时拉取用户个人上下文）。
  *
  * 工具是档案的唯一写入方之一（另一方是设置页面板）；两者共用 store.js
  * 的校验与 mutate 事务。list/get 返回结构化 JSON，render 同时给出可读
@@ -133,6 +134,102 @@ function renderAssets(view) {
 	for (const [currency, bucket] of Object.entries(totals.totals ?? {})) {
 		lines.push(`\n**合计（${currency}）**：现金 ${fmtMoney(bucket.bank + bucket.pay)} + 股票账户 ${fmtMoney(bucket.stock)} + 持仓市值 ${fmtMoney(bucket.holdings)} = **${fmtMoney(bucket.grand)}**`);
 	}
+	return lines.join('\n');
+}
+
+// ---------------------------------------------------------------------------
+// 个人上下文摘要（personal_context）：一次调用给全对话所需的背景
+// ---------------------------------------------------------------------------
+
+/** 把完整档案压成对话可用的上下文摘要（身份 / 在职 / 身边的人 / 最新感悟 / 资产合计）。 */
+function contextDigest(profile) {
+	const view = profileView(profile);
+	const career = view.career || [];
+	const current = career.find((x) => x.current) || null;
+	const relations = view.relations || [];
+	const reflections = view.reflections || []; // profileView 已按日期倒序
+	const latest = reflections[0] || null;
+	const assets = view.assets || { accounts: [], holdings: [], totals: { totals: {} } };
+	const totals = (assets.totals && assets.totals.totals) || {};
+	const accountName = new Map(assets.accounts.map((x) => [x.id, x.name]));
+	return {
+		identity: view.identity,
+		currentJob: current === null ? null : {
+			company: current.company,
+			title: current.title,
+			since: current.startDate,
+			location: current.location || '',
+			salary: current.salary || null,
+		},
+		careerCount: career.length,
+		relations: relations.slice(0, 8).map((x) => ({ name: x.name, relation: x.relation, group: x.group || '' })),
+		relationCount: relations.length,
+		latestReflection: latest === null ? null : {
+			date: latest.date,
+			title: latest.title || '',
+			excerpt: String(latest.content || '').replace(/\s+/g, ' ').slice(0, 160),
+		},
+		reflectionCount: reflections.length,
+		assets: {
+			totals,
+			accountCount: (assets.totals && assets.totals.accountCount) || assets.accounts.length,
+			holdingCount: (assets.totals && assets.totals.holdingCount) || assets.holdings.length,
+			topHoldings: (assets.holdings || []).slice(0, 5).map((x) => ({
+				account: accountName.get(x.account) ?? x.account,
+				code: x.code,
+				name: x.name || '',
+				shares: x.shares,
+				marketValue: x.price === null || x.price === undefined ? null : Math.round(x.shares * x.price * 100) / 100,
+			})),
+		},
+		meta: view.meta,
+	};
+}
+
+/** 摘要的可读渲染：一段紧凑的 Markdown，适合直接进入对话上下文。 */
+function renderContext(digest) {
+	const lines = ['### 个人上下文'];
+	const id = digest.identity || {};
+	const who = [id.name, id.gender, id.age !== null && id.age !== undefined ? `${id.age} 岁` : '', id.residence].filter(Boolean).join(' · ');
+	lines.push(who || '（身份信息未填写，用 personal_identity 的 patch 录入）');
+	if (id.birthplace || id.origin) lines.push(`出生地 ${id.birthplace || '—'} · 归属地 ${id.origin || '—'}`);
+	if (digest.currentJob) {
+		const j = digest.currentJob;
+		const salary = j.salary && j.salary.amount
+			? `，${j.salary.period === 'monthly' ? '月薪' : j.salary.period === 'annual' ? '年薪' : '薪资'} ${fmtMoney(j.salary.amount, j.salary.currency || 'CNY')}`
+			: '';
+		lines.push(`\n**在职**：${j.title} · ${j.company}（${j.since} 起${j.location ? '，' + j.location : ''}${salary}）｜共 ${digest.careerCount} 段经历`);
+	} else {
+		lines.push(`\n**在职**：无记录｜共 ${digest.careerCount} 段经历`);
+	}
+	if (digest.relationCount === 0) {
+		lines.push('**身边的人**：暂无记录');
+	} else {
+		const names = digest.relations.map((r) => `${r.name}（${r.relation}${r.group ? '·' + r.group : ''}）`).join('、');
+		lines.push(`**身边的人**：${names}${digest.relationCount > 8 ? ` 等 ${digest.relationCount} 人` : ''}`);
+	}
+	if (digest.latestReflection) {
+		const r = digest.latestReflection;
+		lines.push(`**最新感悟**（${r.date}）：${r.title ? r.title + ' —— ' : ''}${r.excerpt}`);
+	} else {
+		lines.push('**最新感悟**：暂无记录');
+	}
+	const buckets = Object.entries(digest.assets.totals || {});
+	if (buckets.length === 0 && digest.assets.accountCount === 0) {
+		lines.push('**资产**：暂无记录');
+	} else {
+		for (const [currency, bucket] of buckets) {
+			lines.push(
+				`**资产（${currency}）**：现金 ${fmtMoney(bucket.bank + bucket.pay, currency)} + 股票账户 ${fmtMoney(bucket.stock, currency)}`
+				+ ` + 持仓市值 ${fmtMoney(bucket.holdings, currency)} = **${fmtMoney(bucket.grand, currency)}**`
+				+ `（${digest.assets.accountCount} 账户 / ${digest.assets.holdingCount} 持仓）`,
+			);
+		}
+		if (digest.assets.topHoldings.length > 0) {
+			lines.push(`主要持仓：${digest.assets.topHoldings.map((x) => `${x.name || x.code}(${x.code}) ×${x.shares}${x.marketValue === null ? '' : '，市值 ' + fmtMoney(x.marketValue)}`).join('；')}`);
+		}
+	}
+	lines.push('\n（各类完整明细可用 personal_identity / personal_career / personal_relations / personal_reflections / personal_assets 查询与更新。）');
 	return lines.join('\n');
 }
 
@@ -387,6 +484,18 @@ export function buildTools() {
 					return { ...result, profile: profileView(loadProfile()) };
 				}
 				throw new StoreError('action 需是 get / save-account / delete-account / save-holding / delete-holding');
+			},
+		},
+		{
+			name: 'personal_context',
+			description:
+				'获取用户个人上下文摘要（一次调用拿全）：身份（姓名/性别/年龄/城市）、当前在职、身边的人、最新感悟、资产合计与主要持仓。' +
+				'在对话中需要结合用户个人背景回答（职业/财务/生活建议、提醒、个性化写作）或开场建立上下文时调用；' +
+				'需要某类完整明细时再用 personal_identity / personal_career / personal_relations / personal_reflections / personal_assets。',
+			parameters: { type: 'object', properties: {}, additionalProperties: false },
+			output: { schema: OBJ_SCHEMA, render: (_a, v) => block(renderContext(v)) },
+			async execute() {
+				return contextDigest(loadProfile());
 			},
 		},
 	];

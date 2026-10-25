@@ -6,7 +6,7 @@
 
 **Un dossier personal de carácter local para [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) — quién soy, qué he hecho, quién me rodea, qué he entendido y qué poseo.**
 
-[![version](https://img.shields.io/badge/version-0.5.0-0071e3)](https://github.com/simonxluo/dsh-myinfo/releases)
+[![version](https://img.shields.io/badge/version-0.6.0-0071e3)](https://github.com/simonxluo/dsh-myinfo/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-34c759)](https://github.com/simonxluo/dsh-myinfo/blob/main/LICENSE)
 [![DeepSeek Harness](https://img.shields.io/badge/DeepSeek_Harness-%E2%89%A5_0.2.1--rc.1-8957e5)](https://github.com/deepseek-ai/deepseek-harness)
 [![platform](https://img.shields.io/badge/platform-Web_%7C_Desktop-8E8E93)](https://github.com/simonxluo/dsh-myinfo)
@@ -42,7 +42,8 @@
 Todas las superficies leen y escriben el mismo archivo local (`$DSH_HOME/integrations/dsh-myinfo/data.json`, permisos 0600 — nunca sale de tu máquina):
 
 - **Herramientas del agente** — `personal_identity` / `personal_career` / `personal_relations` / `personal_reflections` / `personal_assets`; registra y consulta directamente desde el chat
-- **Panel principal** (estética Apple) — el icono de perfil de la barra lateral abre un dossier a página completa con cabecera hero y un control segmentado de los cinco dominios
+- **`personal_context`** — una sola llamada devuelve el resumen completo del contexto personal (identidad, empleo actual, relaciones clave, última reflexión, totales de activos con principales posiciones), para que el agente capte tu fondo en tiempo real durante la conversación
+- **Panel principal** (estética Apple, tablero de tarjetas) — el icono de perfil de la barra lateral abre una cuadrícula de tarjetas: cada dominio es una tarjeta con su resumen; haz clic para entrar en la página de detalle (cápsula de vuelta para regresar)
 - **Overlay de activos** — una píldora de cristal esmerilado en la esquina inferior derecha muestra tu total neto; haz clic para la tarjeta rápida y un salto al panel; se actualiza cada minuto
 - **Dock derecho** — un resumen compacto del perfil acoplado al panel derecho de la sesión (「Dock to right」 en el panel principal, o desde la página de guía del dock)
 - **Sección de ajustes** — Ajustes de DSH → Personal Info, compartiendo los mismos formularios de cinco dominios
