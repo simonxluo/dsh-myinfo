@@ -639,11 +639,95 @@ function removeFrom(listFn, id, label) {
 	});
 }
 
-const ENTRY_SCHEMA = (description) => ({
+// 显式 entry schema：字段规则放进参数本身（模型可见的结构化契约），
+// 描述只讲"做什么/何时用"，字段说明留在各自的 description 里——每个事实只说一次。
+const SALARY_SCHEMA = {
 	type: 'object',
-	additionalProperties: true,
-	description,
-});
+	description: '薪资',
+	properties: {
+		amount: { type: 'number', description: '金额' },
+		currency: { type: 'string', description: '币种，默认 CNY' },
+		period: { type: 'string', enum: ['monthly', 'annual', 'hourly', 'total', 'other'], description: '计薪周期，默认 monthly' },
+		notes: { type: 'string', description: '备注（年终奖、构成等）' },
+	},
+	additionalProperties: false,
+};
+
+const CAREER_ENTRY_SCHEMA = {
+	type: 'object',
+	description: '完整工作经历条目（add/update 必填；update 整体替换，未填字段清空）',
+	properties: {
+		company: { type: 'string', description: '公司名（必填）' },
+		title: { type: 'string', description: '职位（必填）' },
+		startDate: { type: 'string', description: '开始时间（必填）：YYYY / YYYY-MM / YYYY-MM-DD' },
+		endDate: { type: 'string', description: '结束时间，格式同 startDate；留空表示在职' },
+		location: { type: 'string', description: '工作地点' },
+		content: { type: 'string', description: '工作内容（markdown）' },
+		salary: SALARY_SCHEMA,
+	},
+	required: ['company', 'title', 'startDate'],
+	additionalProperties: false,
+};
+
+const RELATION_ENTRY_SCHEMA = {
+	type: 'object',
+	description: '完整人际关系条目（add/update 必填）',
+	properties: {
+		name: { type: 'string', description: '姓名（必填）' },
+		relation: { type: 'string', description: '与用户的关系（必填），如 母亲/大学室友/前同事/导师' },
+		group: { type: 'string', description: '分组：家人/朋友/同事/同学/其他，默认 其他' },
+		contact: { type: 'string', description: '联系方式' },
+		notes: { type: 'string', description: '备注（长文本）' },
+		tags: { type: 'array', items: { type: 'string' }, description: '标签' },
+	},
+	required: ['name', 'relation'],
+	additionalProperties: false,
+};
+
+const REFLECTION_ENTRY_SCHEMA = {
+	type: 'object',
+	description: '完整感悟条目（add/update 必填）',
+	properties: {
+		date: { type: 'string', description: '记录日期（必填）YYYY-MM-DD' },
+		title: { type: 'string', description: '标题' },
+		content: { type: 'string', description: '正文（必填，markdown）' },
+		tags: { type: 'array', items: { type: 'string' }, description: '标签' },
+	},
+	required: ['date', 'content'],
+	additionalProperties: false,
+};
+
+const ACCOUNT_SCHEMA = {
+	type: 'object',
+	description: '账户条目（save-account 必填）',
+	properties: {
+		kind: { type: 'string', enum: ['bank', 'pay', 'stock'], description: 'bank 银行卡 / pay 支付宝微信等 / stock 股票账户（必填）' },
+		name: { type: 'string', description: '名称（必填），如 招商银行·欠款' },
+		balance: { type: 'number', description: '余额（必填）；欠款/负债记负数' },
+		mask: { type: 'string', description: '卡号尾号等标识' },
+		currency: { type: 'string', description: '币种，默认 CNY' },
+		notes: { type: 'string', description: '备注（如还款计划）' },
+	},
+	required: ['kind', 'name', 'balance'],
+	additionalProperties: false,
+};
+
+const HOLDING_SCHEMA = {
+	type: 'object',
+	description: '持仓条目（save-holding 必填）',
+	properties: {
+		account: { type: 'string', description: '归属账户（必填）：账户 id 或名称' },
+		code: { type: 'string', description: '证券代码（必填）：600519 / 00700 / AAPL' },
+		shares: { type: 'number', description: '股数（必填，正数）' },
+		name: { type: 'string', description: '名称；留空可由行情回填' },
+		market: { type: 'string', description: '市场：SH/SZ/BJ/HK/US 或 沪/深/北/港/美；留空按代码推断' },
+		costPrice: { type: 'number', description: '成本价' },
+		price: { type: 'number', description: '最新价（可交给 refresh-prices 维护）' },
+		notes: { type: 'string', description: '备注' },
+	},
+	required: ['account', 'code', 'shares'],
+	additionalProperties: false,
+};
 
 function idField(label) {
 	return { type: 'string', description: `${label} id（list 结果里的 id；update/delete 必填，add 留空）` };
@@ -658,17 +742,27 @@ export function buildTools() {
 		{
 			name: 'personal_identity',
 			description:
-				'读取或更新用户基本信息（姓名/性别/出生日期/出生地/归属地/现居地/电话/邮箱/备注）。' +
-				'get 返回当前信息（含按出生日期计算的年龄）；patch 传入要修改的字段（未传字段保持不变），' +
-				'birthDate 格式 YYYY-MM-DD。用户聊到自己的基本情况时用本工具记录或查询。',
+				'读取或更新用户基本信息（get 返回含按出生日期自动计算的年龄）。' +
+				'用户聊到自己的姓名/生日/城市/联系方式等基本情况时，用本工具查询或记录。',
 			parameters: {
 				type: 'object',
 				properties: {
-					action: { type: 'string', enum: ['get', 'patch'], description: 'get 读取；patch 部分更新' },
+					action: { type: 'string', enum: ['get', 'patch'], description: 'get 读取；patch 部分更新（只传要改的字段，未传字段不变）' },
 					patch: {
 						type: 'object',
-						additionalProperties: true,
-						description: '要更新的字段（仅接受字符串值）：name/gender/birthDate/birthplace/origin/residence/phone/email/notes',
+						description: '要更新的身份字段（patch 必填，各字段均可选）',
+						properties: {
+							name: { type: 'string', description: '姓名' },
+							gender: { type: 'string', description: '性别' },
+							birthDate: { type: 'string', description: '出生日期 YYYY-MM-DD' },
+							birthplace: { type: 'string', description: '出生地' },
+							origin: { type: 'string', description: '归属地' },
+							residence: { type: 'string', description: '现居地' },
+							phone: { type: 'string', description: '电话' },
+							email: { type: 'string', description: '邮箱' },
+							notes: { type: 'string', description: '备注（长文本：证件、学历、健康等）' },
+						},
+						additionalProperties: false,
 					},
 				},
 				required: ['action'],
@@ -693,16 +787,14 @@ export function buildTools() {
 		{
 			name: 'personal_career',
 			description:
-				'管理工作经历：list 列出（按开始时间倒序，标记在职）；add 新增；update 按 id 修改（entry 整体替换，未填字段清空）；delete 按 id 删除。' +
-				'entry 字段：company/title 必填，startDate 必填（YYYY / YYYY-MM / YYYY-MM-DD），endDate 留空表示在职，' +
-				'location 工作地点，content 工作内容（markdown），salary:{amount 数字, currency 默认 CNY, period monthly|annual|hourly|total|other, notes}。' +
+				'管理工作经历（list 按开始时间倒序并标记在职；update 按 id 整体替换）。' +
 				'用户提到入职、离职、跳槽、薪资变化时更新本档案。',
 			parameters: {
 				type: 'object',
 				properties: {
 					action: { type: 'string', enum: ['list', 'add', 'update', 'delete'], description: '操作类型' },
 					id: idField('工作经历'),
-					entry: ENTRY_SCHEMA('完整的工作经历条目（add/update 必填）'),
+					entry: CAREER_ENTRY_SCHEMA,
 				},
 				required: ['action'],
 				additionalProperties: false,
@@ -730,16 +822,14 @@ export function buildTools() {
 		{
 			name: 'personal_relations',
 			description:
-				'管理「周围的人」：list 列出；add 新增；update 按 id 修改；delete 按 id 删除。' +
-				'entry 字段：name/relation 必填（relation 是与用户的关系，如 母亲/大学室友/前同事/导师），' +
-				'group 分组（家人/朋友/同事/同学/其他，默认 其他），contact 联系方式，notes 备注，tags 标签数组。' +
-				'用户提到家人朋友同事时记录，便于后续回忆人物关系。',
+				'管理「周围的人」（家人/朋友/同事/同学）：list 列出；add/update/delete 增删改。' +
+				'用户提到身边的具体的人时记录，便于回忆人物关系。',
 			parameters: {
 				type: 'object',
 				properties: {
 					action: { type: 'string', enum: ['list', 'add', 'update', 'delete'], description: '操作类型' },
 					id: idField('人际关系'),
-					entry: ENTRY_SCHEMA('完整的人际关系条目（add/update 必填）'),
+					entry: RELATION_ENTRY_SCHEMA,
 				},
 				required: ['action'],
 				additionalProperties: false,
@@ -767,15 +857,14 @@ export function buildTools() {
 		{
 			name: 'personal_reflections',
 			description:
-				'管理人生感悟（按时间归档）：list 按日期倒序列出；add 新增；update 按 id 修改；delete 按 id 删除。' +
-				'entry 字段：date 必填（YYYY-MM-DD），content 必填（markdown 正文），title 可选标题，tags 标签数组。' +
-				'用户表达对人生的感悟、复盘、阶段总结时，按当时的日期记录下来。',
+				'管理人生感悟（list 按日期倒序归档）。' +
+				'用户表达感悟、复盘、阶段总结时，按当天日期记录。',
 			parameters: {
 				type: 'object',
 				properties: {
 					action: { type: 'string', enum: ['list', 'add', 'update', 'delete'], description: '操作类型' },
 					id: idField('人生感悟'),
-					entry: ENTRY_JSON_SAFE(),
+					entry: REFLECTION_ENTRY_SCHEMA,
 				},
 				required: ['action'],
 				additionalProperties: false,
@@ -803,25 +892,21 @@ export function buildTools() {
 		{
 			name: 'personal_assets',
 			description:
-				'管理个人资产台账：get 查看全部（各账户余额、持仓明细、按币种合计）。' +
-				'save-account 新增/更新账户（id 留空新增，传 id 更新）：kind=bank 银行卡 / pay 支付宝、微信等 / stock 股票账户；' +
-				'name 必填，mask 卡号尾号等标识，balance 数字余额，currency 默认 CNY，notes 备注。' +
-				'save-holding 新增/更新持仓（同花顺等账户的股票）：account 归属账户（账户 id 或名称），code 证券代码，name 名称，' +
-				'market 市场（SH/SZ/BJ/HK/US，或 沪/深/北/港/美），shares 股数，costPrice 成本价，price 最新价，notes。' +
-				'delete-account / delete-holding 按 id 删除。refresh-prices 一键拉取腾讯免费行情（A股/港股/美股）批量刷新所有持仓的' +
-				'最新价并回填缺失名称，市值与合计随之更新——只发送证券代码，不发送任何账户信息。' +
-				'用户报余额、查资产、说持仓变动时调用；看盘后想更新市值就跑 refresh-prices。',
+				'管理个人资产台账（账户余额 + 股票持仓，按币种自动合计，欠款记负余额账户）。' +
+				'get 查看全部；refresh-prices 一键拉取腾讯免费行情批量刷新全部持仓现价（只发送证券代码，不发送账户信息）；' +
+				'save-account / save-holding 新增或按 id 更新，delete-account / delete-holding 按 id 删除。' +
+				'用户报余额、说持仓变动时调用；看盘后想更新市值就跑 refresh-prices。',
 			parameters: {
 				type: 'object',
 				properties: {
 					action: {
 						type: 'string',
 						enum: ['get', 'refresh-prices', 'save-account', 'delete-account', 'save-holding', 'delete-holding'],
-						description: '操作类型（refresh-prices = 批量刷新全部持仓现价）',
+						description: '操作类型',
 					},
 					id: { type: 'string', description: 'save-*/delete-* 时目标条目 id（save 留空表示新增）' },
-					account: ENTRY_SCHEMA('账户条目（save-account 必填）'),
-					holding: ENTRY_SCHEMA('持仓条目（save-holding 必填）'),
+					account: ACCOUNT_SCHEMA,
+					holding: HOLDING_SCHEMA,
 				},
 				required: ['action'],
 				additionalProperties: false,
@@ -868,14 +953,12 @@ export function buildTools() {
 		{
 			name: 'personal_search',
 			description:
-				'跨个人档案模糊搜索：一个关键词同时查六类数据——基本信息/工作经历/周围的人/人生感悟/资产账户/持仓' +
-				'（大小写不敏感的包含匹配；多个关键词用空格分隔，需全部命中）。返回命中条目的 id、标题、命中字段与摘要。' +
-				'按人名、公司、股票代码、标签、感悟内容等任何线索回忆信息时用本工具；' +
-				'总览用 personal_context，查看某类完整数据用 personal_identity / personal_career / personal_relations / personal_reflections / personal_assets。',
+				'跨个人档案模糊搜索：一个关键词同时查六类数据——基本信息/工作经历/周围的人/人生感悟/资产账户/持仓，' +
+				'返回命中条目的 id、命中字段与摘要。按人名、公司、股票代码、标签、感悟内容等任何线索回忆信息时用本工具。',
 			parameters: {
 				type: 'object',
 				properties: {
-					query: { type: 'string', description: '关键词，如 "杨锴"、"腾讯"、"600519"、"炒股"；多个关键词空格分隔（AND 语义）' },
+					query: { type: 'string', description: '关键词（大小写不敏感包含匹配），如 "杨锴"、"腾讯"、"600519"、"炒股"；多个关键词空格分隔、需全部命中' },
 					categories: {
 						type: 'array',
 						items: { type: 'string', enum: Object.keys(CATEGORY_LABELS) },
@@ -892,12 +975,4 @@ export function buildTools() {
 			},
 		},
 	];
-}
-
-function ENTRY_JSON_SAFE() {
-	return {
-		type: 'object',
-		additionalProperties: true,
-		description: '完整的感悟条目（add/update 必填）：date(YYYY-MM-DD)、content、title?、tags?',
-	};
 }
