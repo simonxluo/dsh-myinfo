@@ -1276,6 +1276,24 @@ function MyInfoDock(props, ctx) {
 
 function apply(ctx) {
 	ctx.effect(() => subscribeLocale(ctx));
+	// 注册日语/西班牙语界面语言（Settings → General 语言选择器会出现「日本語 / Español」，
+	// 回落链 en；插件清单标题/描述按 locale/ja.json、locale/es.json 解析）。
+	// locale 是可选服务：缺失时跳过；已被其他插件注册（duplicate）时静默忽略。
+	ctx.effect(() => {
+		const service = localeServiceOf(ctx);
+		if (!service || typeof service.addLanguage !== "function") return;
+		const disposers = [];
+		for (const language of [
+			{ id: "ja", label: "日本語", fallback: "en" },
+			{ id: "es", label: "Español", fallback: "en" },
+		]) {
+			try {
+				const dispose = service.addLanguage(language);
+				if (typeof dispose === "function") disposers.push(dispose);
+			} catch (e) { /* 已注册则跳过 */ }
+		}
+		return () => { for (const dispose of disposers) { try { dispose(); } catch (e) {} } };
+	});
 	ctx.slots.inject("settings.section", () => ctx.slots.register({
 		name: "settings.section",
 		id: "dsh-myinfo",
