@@ -438,6 +438,166 @@ function renderSearch(output) {
 }
 
 // ---------------------------------------------------------------------------
+// 行情刷新（personal_assets refresh-prices）：腾讯免费行情接口，免依赖零配置
+// 只发送证券代码（公开市场数据），绝不发送任何账户信息。
+// ---------------------------------------------------------------------------
+
+const QUOTE_API = 'https://qt.gtimg.cn/q=';
+
+/** market 字段 → 腾讯代码前缀；兼容常见中英文写法（sh/沪、sz/深、bj/北、hk/港、us/美）。 */
+const QUOTE_PREFIX_BY_MARKET = [
+	[/^(sh|sse|sha)$/i, 'sh'], [/沪|上海/, 'sh'],
+	[/^(sz|szse)$/i, 'sz'], [/深/, 'sz'],
+	[/^(bj|bse|neeq)$/i, 'bj'], [/北/, 'bj'],
+	[/^(hk|hkex)$/i, 'hk'], [/港/, 'hk'],
+	[/^(us|usa)$/i, 'us'], [/美/, 'us'],
+];
+
+function quotePrefixOf(market) {
+	const m = String(market ?? '').trim();
+	if (m === '') return '';
+	for (const [re, prefix] of QUOTE_PREFIX_BY_MARKET) {
+		if (re.test(m)) return prefix;
+	}
+	return '';
+}
+
+/** market 留空时按代码推断：6 位数字按首位分流 A 股三市，5 位数字视为港股，含字母视为美股。 */
+function inferPrefixByCode(code) {
+	const c = String(code ?? '').trim();
+	if (/^\d{5}$/.test(c)) return 'hk';
+	if (/^\d{6}$/.test(c)) {
+		if (c.startsWith('92')) return 'bj';
+		if (/^[69]/.test(c)) return 'sh';
+		if (/^[023]/.test(c)) return 'sz';
+		if (/^[48]/.test(c)) return 'bj';
+		return '';
+	}
+	if (/^[A-Za-z][A-Za-z0-9.]{0,10}$/.test(c)) return 'us';
+	return '';
+}
+
+/**
+ * 批量拉取腾讯行情：一次请求多个代码，GBK 解码，解析出 名称/现价/昨收。
+ * 返回 Map<小写symbol, {name, code, price, prevClose}>；接口没返回的代码不在 Map 里。
+ */
+async function fetchQuotes(symbols, fetchImpl) {
+	const fetchFn = fetchImpl ?? globalThis.fetch;
+	if (typeof fetchFn !== 'function') throw new StoreError('当前运行时没有可用的 fetch');
+	if (symbols.length === 0) return new Map();
+	let response;
+	try {
+		response = await fetchFn(QUOTE_API + symbols.join(','), {
+			headers: { 'User-Agent': 'Mozilla/5.0', Accept: '*/*' },
+			signal: AbortSignal.timeout(10_000),
+		});
+	} catch (err) {
+		throw new StoreError(`行情接口不可达（${err?.message ?? err}）`);
+	}
+	if (!response.ok) throw new StoreError(`行情接口 HTTP ${response.status}`);
+	const buffer = await response.arrayBuffer();
+	let text;
+	try {
+		text = new TextDecoder('gbk').decode(buffer);
+	} catch {
+		text = new TextDecoder('utf-8').decode(buffer); // 名字可能乱码，数字字段仍可解析
+	}
+	const quotes = new Map();
+	for (const match of text.matchAll(/v_([A-Za-z0-9.]+)="([^"]*)"/g)) {
+		const parts = match[2].split('~');
+		const price = Number(parts[3]);
+		if (parts.length > 4 && Number.isFinite(price) && price > 0) {
+			quotes.set(match[1].toLowerCase(), {
+				name: parts[1], code: parts[2], price,
+				prevClose: Number(parts[4]) || null,
+			});
+		}
+	}
+	return quotes;
+}
+
+/** refresh-prices 主逻辑：解析全部持仓 → 一次批量行情 → 回写现价（顺带补空名称）。 */
+async function refreshPrices() {
+	const profile = loadProfile();
+	if (profile.assets.holdings.length === 0) {
+		throw new StoreError('没有持仓可刷新，先用 save-holding 录入');
+	}
+	const failures = [];
+	const targets = [];
+	for (const holding of profile.assets.holdings) {
+		const prefix = quotePrefixOf(holding.market) || inferPrefixByCode(holding.code);
+		if (prefix === '') {
+			failures.push({ id: holding.id, code: holding.code, reason: '无法识别市场（market 留空且代码无法推断），请补 market：SH/SZ/BJ/HK/US' });
+			continue;
+		}
+		const body = prefix === 'hk' ? String(holding.code).replace(/\D/g, '').padStart(5, '0') : String(holding.code).trim();
+		targets.push({ id: holding.id, code: holding.code, symbol: (prefix + body).toLowerCase() });
+	}
+	if (targets.length === 0) {
+		return { action: 'refresh-prices', updated: 0, updates: [], failures, profile: profileView(loadProfile()) };
+	}
+	const quotes = await fetchQuotes(targets.map((x) => x.symbol));
+	if (quotes.size === 0) throw new StoreError('行情接口没有返回任何报价（代码可能全部无效）');
+	const byId = new Map(profile.assets.holdings.map((x) => [x.id, x]));
+	const updates = [];
+	for (const target of targets) {
+		const holding = byId.get(target.id);
+		const quote = quotes.get(target.symbol);
+		if (holding === undefined) continue;
+		if (quote === undefined) {
+			failures.push({ id: target.id, code: target.code, reason: `行情接口未返回 ${target.symbol}（停牌或代码有误）` });
+			continue;
+		}
+		updates.push({
+			id: target.id,
+			code: holding.code,
+			name: holding.name || quote.name,
+			oldPrice: holding.price ?? null,
+			newPrice: Math.round(quote.price * 100) / 100,
+			changePct: quote.prevClose ? Math.round(((quote.price - quote.prevClose) / quote.prevClose) * 10000) / 100 : null,
+		});
+	}
+	if (updates.length > 0) {
+		mutate((current) => {
+			const map = new Map(current.assets.holdings.map((x) => [x.id, x]));
+			for (const u of updates) {
+				const holding = map.get(u.id);
+				if (holding === undefined) continue;
+				holding.price = u.newPrice;
+				if (!holding.name && u.name) holding.name = u.name;
+			}
+		});
+	}
+	return {
+		action: 'refresh-prices',
+		updated: updates.length,
+		updates,
+		failures,
+		quotesAt: new Date().toISOString(),
+		profile: profileView(loadProfile()),
+	};
+}
+
+function renderRefresh(output) {
+	const lines = ['### 行情刷新'];
+	if (output.updates.length > 0) {
+		lines.push(`更新 ${output.updates.length} 条现价：`);
+		for (const u of output.updates) {
+			const pct = u.changePct === null ? '' : `（今日 ${u.changePct >= 0 ? '+' : ''}${u.changePct}%）`;
+			lines.push(`- ${u.name || u.code}：${u.oldPrice ?? '—'} → **${u.newPrice}**${pct}`);
+		}
+	} else {
+		lines.push('没有可更新的报价。');
+	}
+	if (output.failures.length > 0) {
+		lines.push(`\n**未更新 ${output.failures.length} 条**：`);
+		for (const f of output.failures) lines.push(`- ${f.code || f.id}：${f.reason}`);
+	}
+	lines.push('\n' + renderAssets(output.profile));
+	return lines.join('\n');
+}
+
+// ---------------------------------------------------------------------------
 // 通用 add/update/delete 逻辑
 // ---------------------------------------------------------------------------
 
@@ -647,15 +807,17 @@ export function buildTools() {
 				'save-account 新增/更新账户（id 留空新增，传 id 更新）：kind=bank 银行卡 / pay 支付宝、微信等 / stock 股票账户；' +
 				'name 必填，mask 卡号尾号等标识，balance 数字余额，currency 默认 CNY，notes 备注。' +
 				'save-holding 新增/更新持仓（同花顺等账户的股票）：account 归属账户（账户 id 或名称），code 证券代码，name 名称，' +
-				'market 市场，shares 股数，costPrice 成本价，price 最新价，notes。delete-account / delete-holding 按 id 删除。' +
-				'用户报余额、查资产、说持仓变动时调用；也可在账户卡片定期更新余额。',
+				'market 市场（SH/SZ/BJ/HK/US，或 沪/深/北/港/美），shares 股数，costPrice 成本价，price 最新价，notes。' +
+				'delete-account / delete-holding 按 id 删除。refresh-prices 一键拉取腾讯免费行情（A股/港股/美股）批量刷新所有持仓的' +
+				'最新价并回填缺失名称，市值与合计随之更新——只发送证券代码，不发送任何账户信息。' +
+				'用户报余额、查资产、说持仓变动时调用；看盘后想更新市值就跑 refresh-prices。',
 			parameters: {
 				type: 'object',
 				properties: {
 					action: {
 						type: 'string',
-						enum: ['get', 'save-account', 'delete-account', 'save-holding', 'delete-holding'],
-						description: '操作类型',
+						enum: ['get', 'refresh-prices', 'save-account', 'delete-account', 'save-holding', 'delete-holding'],
+						description: '操作类型（refresh-prices = 批量刷新全部持仓现价）',
 					},
 					id: { type: 'string', description: 'save-*/delete-* 时目标条目 id（save 留空表示新增）' },
 					account: ENTRY_SCHEMA('账户条目（save-account 必填）'),
@@ -664,11 +826,12 @@ export function buildTools() {
 				required: ['action'],
 				additionalProperties: false,
 			},
-			output: { schema: OBJ_SCHEMA, render: (_a, v) => block(renderAssets(v && v.profile !== undefined ? v.profile : v)) },
+			output: { schema: OBJ_SCHEMA, render: (_a, v) => block(v && v.action === 'refresh-prices' ? renderRefresh(v) : renderAssets(v && v.profile !== undefined ? v.profile : v)) },
 			async execute(rawArgs) {
 				const args = rawArgs || {};
 				const action = str(args, 'action');
 				if (action === 'get') return profileView(loadProfile());
+				if (action === 'refresh-prices') return refreshPrices();
 				if (action === 'save-account') {
 					const value = accountEntry(args.account);
 					const { result } = upsertInto(accountList, 'account', value, str(args, 'id'), '资产账户');
@@ -687,7 +850,7 @@ export function buildTools() {
 					const { result } = removeFrom(holdingList, str(args, 'id'), '持仓');
 					return { ...result, profile: profileView(loadProfile()) };
 				}
-				throw new StoreError('action 需是 get / save-account / delete-account / save-holding / delete-holding');
+				throw new StoreError('action 需是 get / refresh-prices / save-account / delete-account / save-holding / delete-holding');
 			},
 		},
 		{

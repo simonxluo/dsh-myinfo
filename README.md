@@ -35,7 +35,7 @@
 - **Career** — company, title, period, work content, salary (current job auto-badged)
 - **Relationships** — people around you and their relation to you, with groups and tags
 - **Reflections** — life notes archived on a dated timeline
-- **Assets** — bank cards, Alipay / WeChat balances, stock-account cash and holdings (e.g. THS A-share positions), totaled per currency
+- **Assets** — bank cards, Alipay / WeChat balances, stock-account cash and holdings (e.g. THS A-share positions), totaled per currency; `refresh-prices` pulls free Tencent quotes (A-share / HK / US) in one call to refresh every holding's live price and market value — tickers only, never account info
 
 ## One data source, five surfaces
 

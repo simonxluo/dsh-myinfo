@@ -1,6 +1,6 @@
 {
   "name": "dsh-myinfo",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "Personal profile manager for DeepSeek Harness: identity, career with salary, relationships, dated reflections, and an asset ledger. Apple-styled main panel + right dock tab + floating asset overlay + agent tools, with manual dark-mode switch; all local-only.",
   "type": "module",
   "license": "MIT",
@@ -31,6 +31,7 @@
     "icon.svg",
     "docs/*.md",
     "test/host.test.mjs",
+    "test/refresh.test.mjs",
     "README.md",
     "LICENSE"
   ],
@@ -47,6 +48,6 @@
     }
   },
   "scripts": {
-    "test": "node test/host.test.mjs"
+    "test": "node test/host.test.mjs && node test/refresh.test.mjs"
   }
 }

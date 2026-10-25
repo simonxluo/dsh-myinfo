@@ -35,7 +35,7 @@
 - **Carrera** — empresa, puesto, periodo, contenido del trabajo y salario (el empleo actual se etiqueta solo)
 - **Relaciones** — las personas de tu entorno y su relación contigo, con grupos y etiquetas
 - **Reflexiones** — notas de vida archivadas en una línea de tiempo por fecha
-- **Patrimonio** — tarjetas bancarias, saldos de Alipay / WeChat, efectivo y posiciones de cuentas de valores (p. ej. acciones A de THS), totalizados por divisa
+- **Patrimonio** — tarjetas bancarias, saldos de Alipay / WeChat, efectivo y posiciones de cuentas de valores (p. ej. acciones A de THS), totalizados por divisa; `refresh-prices` obtiene en una sola llamada cotizaciones gratuitas de Tencent (acciones A / HK / EE. UU.) y actualiza el precio y valor de mercado de todas las posiciones — solo se envían códigos de valores, nunca información de la cuenta
 
 ## Un origen de datos, cinco superficies
 
