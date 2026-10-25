@@ -228,7 +228,7 @@ if (!clientSrc.includes('dmi-detail-head')) throw new Error('detail head missing
 if (!clientSrc.includes('const [page, setPage] = useState(null)')) throw new Error('panel page state missing');
 if (!clientSrc.includes('onOpen: () => setPage(key)')) throw new Error('cards should navigate into the detail page');
 if (!clientSrc.includes('data-sidebar-right-open')) throw new Error('overlay should hide while the right dock is open');
-if (!clientSrc.includes('dmi-docknav')) throw new Error('dock quick-nav for career/relations/reflections missing');
+if (!clientSrc.includes('dmi-cards--dock')) throw new Error('dock digest should reuse the titled domain cards');
 
 rmSync(dir, { recursive: true, force: true });
 console.log('ALL HOST TESTS PASSED (incl. audit regressions)');
