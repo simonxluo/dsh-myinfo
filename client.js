@@ -173,19 +173,20 @@ async function api(action, payload) {
 // ---------------------------------------------------------------------------
 
 // Apple 设计语言：SF 字体栈、毛玻璃材质、hairline 分隔、大圆角、克制动效。
-// 明暗双主题由 .dmi-scope / .dmi-scope.dmi-dark 切换；默认跟随系统偏好。
+// 颜色 token 双层结构：宿主 --dsw-alias-* 变量优先（宿主切主题时自动跟随），
+// Apple 色字面量兜底；.dmi-scope / .dmi-scope.dmi-dark 只切换兜底字面量（供无 dsw 变量的环境）。
 const STYLE_CSS = ""
-+ ".dmi-scope{--dmi-accent:#007AFF;--dmi-red:#FF3B30;--dmi-green:#34C759;--dmi-orange:#FF9500;"
-+ "--dmi-text:#1d1d1f;--dmi-text-2:rgba(60,60,67,.66);--dmi-text-3:rgba(60,60,67,.4);"
-+ "--dmi-sep:rgba(0,0,0,.08);--dmi-fill:rgba(120,120,128,.10);--dmi-fill-2:rgba(120,120,128,.16);"
-+ "--dmi-bg:rgba(255,255,255,.72);--dmi-bg-elev:rgba(255,255,255,.88);--dmi-bg-opaque:#f5f5f7;"
++ ".dmi-scope{--dmi-accent:var(--dsw-alias-brand-primary,#007AFF);--dmi-red:var(--dsw-alias-state-error-primary,#FF3B30);--dmi-green:var(--dsw-alias-state-success-primary,#34C759);--dmi-orange:var(--dsw-alias-state-warn-primary,#FF9500);"
++ "--dmi-text:var(--dsw-alias-label-primary,#1d1d1f);--dmi-text-2:var(--dsw-alias-label-secondary,rgba(60,60,67,.66));--dmi-text-3:color-mix(in srgb,var(--dmi-text-2) 62%,transparent);"
++ "--dmi-sep:var(--dsw-alias-border-l1,rgba(0,0,0,.08));--dmi-fill:color-mix(in srgb,var(--dmi-text) 8%,transparent);--dmi-fill-2:color-mix(in srgb,var(--dmi-text) 14%,transparent);"
++ "--dmi-bg:var(--dsw-alias-bg-overlay,rgba(255,255,255,.72));--dmi-bg-elev:var(--dsw-alias-bg-layer-1,rgba(255,255,255,.88));--dmi-bg-opaque:var(--dsw-alias-bg-base,#f5f5f7);"
 + "--dmi-shadow:0 10px 40px rgba(0,0,0,.14),0 2px 10px rgba(0,0,0,.06);--dmi-shadow-sm:0 2px 10px rgba(0,0,0,.08);"
 + "font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','PingFang SC','Helvetica Neue',sans-serif;"
 + "-webkit-font-smoothing:antialiased;color:var(--dmi-text)}"
-+ ".dmi-scope.dmi-dark{--dmi-accent:#0A84FF;--dmi-red:#FF453A;--dmi-green:#30D158;--dmi-orange:#FF9F0A;"
-+ "--dmi-text:#f5f5f7;--dmi-text-2:rgba(235,235,245,.64);--dmi-text-3:rgba(235,235,245,.42);"
-+ "--dmi-sep:rgba(255,255,255,.12);--dmi-fill:rgba(120,120,128,.24);--dmi-fill-2:rgba(120,120,128,.34);"
-+ "--dmi-bg:rgba(32,32,36,.66);--dmi-bg-elev:rgba(48,48,52,.82);--dmi-bg-opaque:#1c1c1e;"
++ ".dmi-scope.dmi-dark{--dmi-accent:var(--dsw-alias-brand-primary,#0A84FF);--dmi-red:var(--dsw-alias-state-error-primary,#FF453A);--dmi-green:var(--dsw-alias-state-success-primary,#30D158);--dmi-orange:var(--dsw-alias-state-warn-primary,#FF9F0A);"
++ "--dmi-text:var(--dsw-alias-label-primary,#f5f5f7);--dmi-text-2:var(--dsw-alias-label-secondary,rgba(235,235,245,.64));--dmi-text-3:color-mix(in srgb,var(--dmi-text-2) 62%,transparent);"
++ "--dmi-sep:var(--dsw-alias-border-l1,rgba(255,255,255,.12));--dmi-fill:color-mix(in srgb,var(--dmi-text) 8%,transparent);--dmi-fill-2:color-mix(in srgb,var(--dmi-text) 14%,transparent);"
++ "--dmi-bg:var(--dsw-alias-bg-overlay,rgba(32,32,36,.66));--dmi-bg-elev:var(--dsw-alias-bg-layer-1,rgba(48,48,52,.82));--dmi-bg-opaque:var(--dsw-alias-bg-base,#1c1c1e);"
 + "--dmi-shadow:0 12px 44px rgba(0,0,0,.5),0 2px 12px rgba(0,0,0,.3);--dmi-shadow-sm:0 2px 12px rgba(0,0,0,.35)}"
 + ".dmi-scope *{box-sizing:border-box}"
 // —— 通用控件：按钮（iOS fill / tinted / plain）、输入、分段控件 ——
@@ -272,7 +273,7 @@ const STYLE_CSS = ""
 + ".dmi-ov-foot{display:flex;gap:8px;padding:10px 14px 14px;border-top:none}";
 
 
-/** 明暗主题：优先宿主 theme 服务，回退系统 prefers-color-scheme。 */
+/** 明暗主题：effectiveDark 判定链（手动 > dsw 亮度实算 > theme id 启发 > 系统偏好）。 */
 function darkClassOf(ctx) {
 	return effectiveDark(ctx) ? " dmi-dark" : "";
 }
@@ -295,7 +296,7 @@ function ensureStyle() {
 
 
 // ---------------------------------------------------------------------------
-// 外观：手动深浅切换（localStorage 持久化），未手动选择时跟随宿主/系统
+// 外观：手动深浅切换（localStorage 持久化）；未手动选择时自动判定（dsw 亮度实算 > theme id 启发 > 系统偏好）
 // ---------------------------------------------------------------------------
 
 const THEME_KEY = "dsh-myinfo.theme"; // "light" | "dark" | 无（自动）
@@ -313,16 +314,72 @@ function setManualTheme(mode) {
 function systemDark() {
 	return !!(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
 }
+
+/** 解析 CSS 颜色为相对亮度 L = 0.2126R+0.7152G+0.0722B（各通道归一到 0-1，忽略 alpha）。
+ *  支持 #rgb/#rgba 简写、#rrggbb/#rrggbbaa、rgb()/rgba()（整数或百分比，逗号/空格分隔）。
+ *  无法解析返回 null，调用方据此落到下一优先级。 */
+function parseColorLuminance(css) {
+	if (typeof css !== "string") return null;
+	const s = css.trim().toLowerCase();
+	let m;
+	if ((m = s.match(/^#([0-9a-f]+)$/))) {
+		const hex = m[1];
+		const dbl = (x) => parseInt(x + x, 16) / 255;
+		if (hex.length === 3 || hex.length === 4) {
+			return 0.2126 * dbl(hex[0]) + 0.7152 * dbl(hex[1]) + 0.0722 * dbl(hex[2]);
+		}
+		if (hex.length === 6 || hex.length === 8) {
+			return 0.2126 * (parseInt(hex.slice(0, 2), 16) / 255)
+				+ 0.7152 * (parseInt(hex.slice(2, 4), 16) / 255)
+				+ 0.0722 * (parseInt(hex.slice(4, 6), 16) / 255);
+		}
+		return null;
+	}
+	if ((m = s.match(/^rgba?\(([^)]+)\)$/))) {
+		const parts = m[1].split(/[\s,\/]+/).filter(Boolean).slice(0, 3);
+		if (parts.length < 3) return null;
+		const chan = [];
+		for (const part of parts) {
+			const pm = part.match(/^([0-9.]+)(%)?$/);
+			if (!pm) return null;
+			const v = Number(pm[1]);
+			if (!isFinite(v)) return null;
+			const one = pm[2] ? v / 100 : v / 255; // 百分比 0-100 → 0-1；整数 0-255 → 0-1
+			chan.push(Math.min(1, Math.max(0, one)));
+		}
+		return 0.2126 * chan[0] + 0.7152 * chan[1] + 0.0722 * chan[2];
+	}
+	return null;
+}
+
+/** 自动明暗判定链：① 宿主 --dsw-alias-bg-base 实算亮度（L < 0.5 判深）
+ *  ② theme 服务 id 启发（含 dark 判深；light/day/default 前缀才判浅，未识别 id 不强制浅色）
+ *  ③ 系统 prefers-color-scheme。手动开关在 effectiveDark 中优先于本链。 */
 function autoDark(ctx) {
+	// ① dsw token 实算：宿主在文档根维护明暗两套 --dsw-alias-* 变量，bg-base 的亮度即宿主底色。
+	try {
+		if (typeof document !== "undefined" && typeof window !== "undefined" && typeof window.getComputedStyle === "function") {
+			const raw = window.getComputedStyle(document.documentElement).getPropertyValue("--dsw-alias-bg-base");
+			if (raw && raw.trim() !== "") {
+				const lum = parseColorLuminance(raw);
+				if (lum !== null) return lum < 0.5;
+			}
+		}
+	} catch (e) { /* 落到 theme id 启发 */ }
+	// ② theme 服务 id 启发：未识别的 id（如 midnight）不再一律强制浅色。
 	try {
 		const theme = (ctx && ctx.theme) || (typeof ctx.get === "function" ? ctx.get("theme") : undefined);
 		if (theme && typeof theme.getTheme === "function") {
 			const snap = theme.getTheme();
-			const id = String((snap && (snap.id || snap.themeId)) || "");
-			if (id.indexOf("dark") >= 0 || (snap && snap.dark === true)) return true;
-			if (id !== "") return false;
+			if (snap && snap.dark === true) return true;
+			const id = String((snap && (snap.id || snap.themeId)) || "").toLowerCase();
+			if (id !== "") {
+				if (id.indexOf("dark") >= 0) return true;
+				if (/^(light|day|default)/.test(id)) return false;
+			}
 		}
 	} catch (e) { /* 回退系统偏好 */ }
+	// ③ 系统偏好。
 	return systemDark();
 }
 function effectiveDark(ctx) {
@@ -392,7 +449,8 @@ function Btn(props) {
 }
 
 function Chip(props) {
-	return h("span", { className: "dmi-chip dmi-chip--" + (props.tone || ""), title: props.title || "" }, props.children);
+	// tone 为空时只输出基类，避免残留的 `dmi-chip--` 空修饰类。
+	return h("span", { className: props.tone ? "dmi-chip dmi-chip--" + props.tone : "dmi-chip", title: props.title || "" }, props.children);
 }
 
 function Field(props) {

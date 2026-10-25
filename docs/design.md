@@ -1,6 +1,6 @@
 # dsh-myinfo 设计文档（控制流 / 数据流 / 模块）
 
-> 前置：数据建模见 `docs/requirements.md`（先建模，后设计）。版本 v0.4.0（workflow 修复 + Apple 风格主面板/浮窗/右栏停靠 + 手动深浅外观）。
+> 前置：数据建模见 `docs/requirements.md`（先建模，后设计）。版本 v0.4.1（v0.4.0 的 Apple 风格主面板/浮窗/右栏停靠 + 手动深浅外观；本版宿主主题集成：dsw token 挂接 + 亮度实算深浅判定）。
 
 ## 1. 模块划分
 
@@ -99,7 +99,7 @@ window.__ModuleLoader__.load({ id:'dsh-myinfo', factory })
 ```
 
 组件内部：挂载时 GET 全量视图 → 每次提交后重新 GET；无本地副本的乐观更新（避免双写不一致）。
-样式约定：全部 CSS 以 `dmi-` 前缀作用域化，由 `ensureStyle()` 在首次挂载时向 `document.head` 注入一次（幂等，卸载重挂不叠加）。
+样式约定：全部 CSS 以 `dmi-` 前缀作用域化，由 `ensureStyle()` 在首次挂载时向 `document.head` 注入一次（幂等，卸载重挂不叠加）。颜色 token 经 `var(--dsw-alias-*)` 挂接宿主主题（Apple 色兜底），深浅判定按 `--dsw-alias-bg-base` 实算亮度，优先级 手动 > dsw 实算 > theme id 启发 > 系统偏好。
 
 ## 3. 数据流
 
