@@ -246,5 +246,14 @@ if (!clientSrc.includes('onOpen: () => setPage(key)')) throw new Error('cards sh
 if (!clientSrc.includes('data-sidebar-right-open')) throw new Error('overlay should hide while the right dock is open');
 if (!clientSrc.includes('dmi-cards--dock')) throw new Error('dock digest should reuse the titled domain cards');
 
+// --- v0.9.1 入口加载回归 ---
+// 891a796 起 index.js 裸导入 @deepseek-ai/schemastery；link: 安装时 ESM 从插件真实路径解析，
+// profile 的 node_modules 不在链上 —— 依赖未装进插件目录时整个插件加载失败（面板 404、
+// 保存报 "Unexpected end of JSON input"），而旧测试从不 import index.js 所以全绿。
+const entry = await import('../index.js');
+if (typeof entry.apply !== 'function' || typeof entry.inject !== 'object' || !entry.Config) {
+	throw new Error('index.js should export apply/inject/Config');
+}
+
 rmSync(dir, { recursive: true, force: true });
 console.log('ALL HOST TESTS PASSED (incl. audit regressions)');

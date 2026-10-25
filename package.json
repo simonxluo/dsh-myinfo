@@ -49,5 +49,8 @@
   },
   "scripts": {
     "test": "node test/host.test.mjs && node test/refresh.test.mjs"
+  },
+  "dependencies": {
+    "@deepseek-ai/schemastery": "^3.18.4"
   }
 }
