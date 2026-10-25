@@ -179,14 +179,14 @@ const STYLE_CSS = ""
 + ".dmi-scope{--dmi-accent:var(--dsw-alias-brand-primary,#007AFF);--dmi-red:var(--dsw-alias-state-error-primary,#FF3B30);--dmi-green:var(--dsw-alias-state-success-primary,#34C759);--dmi-orange:var(--dsw-alias-state-warn-primary,#FF9500);"
 + "--dmi-text:var(--dsw-alias-label-primary,#1d1d1f);--dmi-text-2:var(--dsw-alias-label-secondary,rgba(60,60,67,.66));--dmi-text-3:color-mix(in srgb,var(--dmi-text-2) 62%,transparent);"
 + "--dmi-sep:var(--dsw-alias-border-l1,rgba(0,0,0,.08));--dmi-fill:color-mix(in srgb,var(--dmi-text) 8%,transparent);--dmi-fill-2:color-mix(in srgb,var(--dmi-text) 14%,transparent);"
-+ "--dmi-bg:var(--dsw-alias-bg-overlay,rgba(255,255,255,.72));--dmi-bg-elev:var(--dsw-alias-bg-layer-1,rgba(255,255,255,.88));--dmi-bg-opaque:var(--dsw-alias-bg-base,#f5f5f7);"
++ "--dmi-bg:var(--dsw-alias-bg-overlay,rgba(255,255,255,.72));--dmi-bg-elev:var(--dsw-alias-bg-layer-1,rgba(255,255,255,.88))"
 + "--dmi-shadow:0 10px 40px rgba(0,0,0,.14),0 2px 10px rgba(0,0,0,.06);--dmi-shadow-sm:0 2px 10px rgba(0,0,0,.08);"
 + "font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','PingFang SC','Helvetica Neue',sans-serif;"
 + "-webkit-font-smoothing:antialiased;color:var(--dmi-text)}"
 + ".dmi-scope.dmi-dark{--dmi-accent:var(--dsw-alias-brand-primary,#0A84FF);--dmi-red:var(--dsw-alias-state-error-primary,#FF453A);--dmi-green:var(--dsw-alias-state-success-primary,#30D158);--dmi-orange:var(--dsw-alias-state-warn-primary,#FF9F0A);"
 + "--dmi-text:var(--dsw-alias-label-primary,#f5f5f7);--dmi-text-2:var(--dsw-alias-label-secondary,rgba(235,235,245,.64));--dmi-text-3:color-mix(in srgb,var(--dmi-text-2) 62%,transparent);"
 + "--dmi-sep:var(--dsw-alias-border-l1,rgba(255,255,255,.12));--dmi-fill:color-mix(in srgb,var(--dmi-text) 8%,transparent);--dmi-fill-2:color-mix(in srgb,var(--dmi-text) 14%,transparent);"
-+ "--dmi-bg:var(--dsw-alias-bg-overlay,rgba(32,32,36,.66));--dmi-bg-elev:var(--dsw-alias-bg-layer-1,rgba(48,48,52,.82));--dmi-bg-opaque:var(--dsw-alias-bg-base,#1c1c1e);"
++ "--dmi-bg:var(--dsw-alias-bg-overlay,rgba(32,32,36,.66));--dmi-bg-elev:var(--dsw-alias-bg-layer-1,rgba(48,48,52,.82))"
 + "--dmi-shadow:0 12px 44px rgba(0,0,0,.5),0 2px 12px rgba(0,0,0,.3);--dmi-shadow-sm:0 2px 12px rgba(0,0,0,.35)}"
 + ".dmi-scope *{box-sizing:border-box}"
 // —— 通用控件：按钮（iOS fill / tinted / plain）、输入、分段控件 ——
@@ -356,21 +356,29 @@ function parseColorLuminance(css) {
  *  ② theme 服务 id 启发（含 dark 判深；light/day/default 前缀才判浅，未识别 id 不强制浅色）
  *  ③ 系统 prefers-color-scheme。手动开关在 effectiveDark 中优先于本链。 */
 function autoDark(ctx) {
-	// ① dsw token 实算：宿主在文档根维护明暗两套 --dsw-alias-* 变量，bg-base 的亮度即宿主底色。
+	// ① dsw token 实算：宿主把 --dsw-alias-* 定义在 body（body{} 与 body[data-ds-dark-theme]{}，
+	// ThemePresenter 也只写 body.style），自定义属性只向子孙继承，必须读 body 而非 documentElement。
 	try {
 		if (typeof document !== "undefined" && typeof window !== "undefined" && typeof window.getComputedStyle === "function") {
-			const raw = window.getComputedStyle(document.documentElement).getPropertyValue("--dsw-alias-bg-base");
-			if (raw && raw.trim() !== "") {
-				const lum = parseColorLuminance(raw);
-				if (lum !== null) return lum < 0.5;
+			const host = document.body || document.documentElement;
+			if (host) {
+				const raw = window.getComputedStyle(host).getPropertyValue("--dsw-alias-bg-base");
+				if (raw && raw.trim() !== "") {
+					const lum = parseColorLuminance(raw);
+					if (lum !== null) return lum < 0.5;
+				}
 			}
 		}
-	} catch (e) { /* 落到 theme id 启发 */ }
-	// ② theme 服务 id 启发：未识别的 id（如 midnight）不再一律强制浅色。
+	} catch (e) { /* 落到 theme 快照判定 */ }
+	// ② theme 快照判定：active.colorScheme 优先，旧式 id 启发兜底（未识别 id 不再一律强制浅色）。
 	try {
 		const theme = (ctx && ctx.theme) || (typeof ctx.get === "function" ? ctx.get("theme") : undefined);
 		if (theme && typeof theme.getTheme === "function") {
 			const snap = theme.getTheme();
+			// 宿主快照的权威判据是 active.colorScheme（'dark'/'light'），系统解析在上游完成；
+			// 顶层 dark/id/themeId 字段在真实 ThemeSnapshot 中并不存在。
+			if (snap && snap.active && snap.active.colorScheme === "dark") return true;
+			if (snap && snap.active && snap.active.colorScheme === "light") return false;
 			if (snap && snap.dark === true) return true;
 			const id = String((snap && (snap.id || snap.themeId)) || "").toLowerCase();
 			if (id !== "") {
@@ -841,7 +849,7 @@ function AssetsTab(props) {
 				h("div", { className: "dmi-stat" }, h("span", null, t("stat.pay") + " · " + currency), h("b", null, fmtMoney(bucket.pay))),
 				h("div", { className: "dmi-stat" }, h("span", null, t("stat.stock") + " · " + currency), h("b", null, fmtMoney(bucket.stock))),
 				h("div", { className: "dmi-stat" }, h("span", null, t("stat.holdings") + " · " + currency), h("b", null, fmtMoney(bucket.holdings))),
-				h("div", { className: "dmi-stat", style: { borderColor: "rgba(59,130,246,.5)" } }, h("span", null, t("stat.grand") + " · " + currency), h("b", null, fmtMoney(bucket.grand)))))),
+				h("div", { className: "dmi-stat", style: { borderColor: "color-mix(in srgb, var(--dmi-accent) 45%, transparent)" } }, h("span", null, t("stat.grand") + " · " + currency), h("b", null, fmtMoney(bucket.grand)))))),
 
 		accounts.length === 0 && holdings.length === 0 ? h("div", { className: "dmi-empty" }, t("empty.assets")) : null,
 		...["bank", "pay", "stock"].map((kind) => {

@@ -77,3 +77,12 @@ workflow 之后的真机端到端（直接调用注册后的 `personal_*` 工具
 
 - `node test/host.test.mjs`：原有断言 + 10 组回归用例全部通过（id 水位线、不可能日期、跨字段校验、类型拒绝、update 缺 id、金额范围、读路径兜底、字符串余额收敛、数组条目剔除、渲染解包）。
 - 安装后实机验收（desktop profile）：5 工具全部注册 ✅；identity/career/relations/reflections/assets 五域读写与 Markdown 渲染 ✅；持仓账户名解析（id→名称）✅；市值与按币种合计 ✅；id 水位线（删 c2 后新增得 c3）✅；面板 GET/POST ✅；跨站写拒绝（evil origin → 403 untrusted）✅；测试数据已全部清理还原。
+
+
+## 6. v0.4.1/v0.4.2 设置页主题缺陷评审（2026-10-25）
+
+- **触发**：用户报告设置页按钮与文字布局被破坏。Playwright 用真实 client.js 模块复现：宿主深色 + 主题 id 不含 "dark"（如 midnight）时 autoDark 误判浅色，深色文字叠宿主深色底。
+- **v0.4.1 修复**（子 agent 执行，commit 1f7f6f5）：颜色 token 挂接 `var(--dsw-alias-*, Apple兜底)` 双层结构；autoDark 增加 dsw 令牌亮度实算与快照判据；Chip 空 tone 残类清理。
+- **跨模型评审**（step-5-preview + glm-5.3-flash，均 pass-with-issues）：确认 CSS token 结构正确、`判定与渲染解耦`论断成立（判错 class 不再影响颜色，仅阴影字面量）、报告症状在真实宿主结构下已消除。发现两个 major：真实宿主令牌挂在 body（非 documentElement）且快照权威判据是 active.colorScheme，v0.4.1 的两条自动判定分支在真实宿主为死代码；以及 parseColorLuminance 测试未入库（minor）。
+- **v0.4.2 修复**：autoDark ① 改读 `getComputedStyle(document.body)`（回退 documentElement）② 增加 `snap.active.colorScheme` 判据；删除死 token --dmi-bg-opaque；hero 卡硬编码蓝边令牌化；parseColorLuminance 11 例 + autoDark 结构断言入库（test/host.test.mjs）；校验页新增 realhost 模式（令牌挂 body + data-ds-dark-theme + 真实快照形状）复刻宿主结构复验通过。
+- **残余已知项**（nit，接受）：--dmi-shadow 明暗两套字面量未 token 化（判错 class 时阴影深浅轻微错配，颜色不受影响）；dsw 变量声明为空串的病理场景无 CSS 兜底（宿主不会产生）。

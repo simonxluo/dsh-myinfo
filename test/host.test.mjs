@@ -132,5 +132,30 @@ const addRender = await career.execute({ action: 'add', entry: { company: 'R公�
 const renderedAdd = (await career.output.render)({}, addRender);
 if (!renderedAdd[0].text.includes('R公司')) throw new Error('render should unwrap wrapper output');
 
+// --- v0.4.x 主题修复回归：parseColorLuminance + autoDark 关键结构 ---
+import { readFileSync as _rf } from 'node:fs';
+const clientSrc = _rf(new URL('../client.js', import.meta.url), 'utf8');
+const fnMatch = clientSrc.match(/function parseColorLuminance\([\s\S]*?\n}/);
+if (fnMatch === null) throw new Error('parseColorLuminance not found in client.js');
+const parseColorLuminance = (0, eval)(`(${fnMatch[0]})`); // 包裹成函数表达式求值
+equal(parseColorLuminance('#1e1e22') < 0.5, true, 'dark hex → dark');
+equal(parseColorLuminance('#ffffff') > 0.5, true, 'white → light');
+equal(parseColorLuminance('rgb(30, 30, 34)') < 0.5, true, 'rgb() dark');
+equal(parseColorLuminance('rgb(255, 255, 255)') > 0.5, true, 'rgb() light');
+equal(parseColorLuminance('rgb(100%, 100%, 100%)') > 0.5, true, 'percent rgb');
+equal(parseColorLuminance('oklch(0.2 0.02 260)'), null, 'oklch → null 回退');
+equal(parseColorLuminance('hsl(0 0% 20%)'), null, 'hsl → null');
+equal(parseColorLuminance('transparent'), null, 'transparent → null');
+equal(parseColorLuminance(''), null, 'empty → null');
+equal(parseColorLuminance('#1e1e22 garbage'), null, 'garbage suffix → null');
+// autoDark 结构断言：真实宿主令牌在 body、快照判据是 active.colorScheme
+if (!clientSrc.includes('getComputedStyle(host)') || !clientSrc.includes('document.body || document.documentElement')) {
+	throw new Error('autoDark should read body-computed tokens first');
+}
+if (!clientSrc.includes('snap.active.colorScheme')) {
+	throw new Error('autoDark should consult snap.active.colorScheme');
+}
+if (clientSrc.includes('--dmi-bg-opaque')) throw new Error('dead token --dmi-bg-opaque should be removed');
+
 rmSync(dir, { recursive: true, force: true });
 console.log('ALL HOST TESTS PASSED (incl. audit regressions)');
