@@ -1066,14 +1066,15 @@ function MyInfoDock(props, ctx) {
 					id.birthplace ? h("span", null, id.birthplace) : null,
 					id.origin ? h("span", null, t("f.origin") + "：" + id.origin) : null),
 				h("div", { className: "dmi-muted", style: { fontSize: 11 } }, t("dock.identity"))),
-			h("div", { className: "dmi-stats" },
-				cny ? [
-					h("div", { key: "g", className: "dmi-stat dmi-stat--hero" }, h("span", null, t("stat.grand")), h("b", null, fmtMoney(cny.grand))),
-					h("div", { key: "b", className: "dmi-stat" }, h("span", null, t("stat.bank")), h("b", null, fmtMoney(cny.bank))),
-					h("div", { key: "p", className: "dmi-stat" }, h("span", null, t("stat.pay")), h("b", null, fmtMoney(cny.pay))),
-					h("div", { key: "s", className: "dmi-stat" }, h("span", null, t("stat.stock")), h("b", null, fmtMoney(cny.stock))),
-					h("div", { key: "h", className: "dmi-stat" }, h("span", null, t("stat.holdings")), h("b", null, fmtMoney(cny.holdings))),
-				] : h("div", { className: "dmi-empty" }, t("ov.empty")),
+			// 统计网格只放统计卡；空态与按钮各自独立成行，不进 grid（否则按钮被拉成网格单元）。
+			cny ? h("div", { className: "dmi-stats" },
+				h("div", { key: "g", className: "dmi-stat dmi-stat--hero" }, h("span", null, t("stat.grand")), h("b", null, fmtMoney(cny.grand))),
+				h("div", { key: "b", className: "dmi-stat" }, h("span", null, t("stat.bank")), h("b", null, fmtMoney(cny.bank))),
+				h("div", { key: "p", className: "dmi-stat" }, h("span", null, t("stat.pay")), h("b", null, fmtMoney(cny.pay))),
+				h("div", { key: "s", className: "dmi-stat" }, h("span", null, t("stat.stock")), h("b", null, fmtMoney(cny.stock))),
+				h("div", { key: "h", className: "dmi-stat" }, h("span", null, t("stat.holdings")), h("b", null, fmtMoney(cny.holdings))))
+				: h("div", { className: "dmi-empty" }, t("ov.empty")),
+			h("div", { className: "dmi-actions" },
 				h(Btn, { size: "sm", variant: "primary", onClick: () => { try { const l = (typeof ctx.get === "function" ? ctx.get("layout") : undefined) || ctx.layout; if (l && l.selectPanel) l.selectPanel("myinfo"); } catch (e) {} } }, t("ov.open"))),
 			(assets.holdings || []).length > 0 ? h("div", { className: "dmi-card" },
 				h("div", { className: "dmi-card-title" }, t("holdings.of") + " · " + assets.holdings.length),

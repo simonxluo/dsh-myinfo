@@ -1,6 +1,6 @@
 # dsh-myinfo 需求文档（含数据建模与功能表单）
 
-> 版本：v0.4.2 · 状态：已实现并通过单元测试（含多模型 workflow 评审回归项）；评审记录见 `docs/workflow-report.md`
+> 版本：v0.4.3 · 状态：已实现并通过单元测试（含多模型 workflow 评审回归项）；评审记录见 `docs/workflow-report.md`
 
 ## 1. 需求分析
 

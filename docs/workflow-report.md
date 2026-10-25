@@ -86,3 +86,10 @@ workflow 之后的真机端到端（直接调用注册后的 `personal_*` 工具
 - **跨模型评审**（step-5-preview + glm-5.3-flash，均 pass-with-issues）：确认 CSS token 结构正确、`判定与渲染解耦`论断成立（判错 class 不再影响颜色，仅阴影字面量）、报告症状在真实宿主结构下已消除。发现两个 major：真实宿主令牌挂在 body（非 documentElement）且快照权威判据是 active.colorScheme，v0.4.1 的两条自动判定分支在真实宿主为死代码；以及 parseColorLuminance 测试未入库（minor）。
 - **v0.4.2 修复**：autoDark ① 改读 `getComputedStyle(document.body)`（回退 documentElement）② 增加 `snap.active.colorScheme` 判据；删除死 token --dmi-bg-opaque；hero 卡硬编码蓝边令牌化；parseColorLuminance 11 例 + autoDark 结构断言入库（test/host.test.mjs）；校验页新增 realhost 模式（令牌挂 body + data-ds-dark-theme + 真实快照形状）复刻宿主结构复验通过。
 - **残余已知项**（nit，接受）：--dmi-shadow 明暗两套字面量未 token 化（判错 class 时阴影深浅轻微错配，颜色不受影响）；dsw 变量声明为空串的病理场景无 CSS 兜底（宿主不会产生）。
+
+## 7. v0.4.3 右栏停靠面板布局修复（2026-10-25）
+
+- **触发**：用户报告「DSH 内嵌面板的个人档案内容布局异常」。代码审查确诊：`MyInfoDock` 的「打开完整档案」按钮与空态文字被错误嵌进 `.dmi-stats` 网格容器（`display:grid`），按钮被拉伸为网格单元与统计卡混排。
+- **根因**：v0.4.0 新增 dock 表面时从未被视觉验证——校验页 surface 不含 dock，且桩 ctx 不提供 `sidebarRightTabs` 服务，dock 注册分支在所有验证中都被跳过。
+- **修复**：统计网格只放统计卡；空态与按钮各自独立成行。全仓审计其余 `.dmi-stats/.dmi-grid` 容器子元素均合规（仅此一处违例）。
+- **验证补口**：校验页新增 `surface=dock`（含 320px 窄列模拟 + sidebarRightTabs 桩），realhost 深色模式截图确认布局正确；单测全绿。
