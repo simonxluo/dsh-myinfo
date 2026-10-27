@@ -6,7 +6,7 @@
 
 **A local-first personal dossier for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) — who I am, what I've done, who's around me, what I've figured out, and what I own.**
 
-[![version](https://img.shields.io/badge/version-0.8.0-0071e3)](https://github.com/simonxluo/dsh-myinfo/releases)
+[![version](https://img.shields.io/badge/version-0.10.0-0071e3)](https://github.com/simonxluo/dsh-myinfo/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-34c759)](https://github.com/simonxluo/dsh-myinfo/blob/main/LICENSE)
 [![DeepSeek Harness](https://img.shields.io/badge/DeepSeek_Harness-%E2%89%A5_0.2.1--rc.1-8957e5)](https://github.com/deepseek-ai/deepseek-harness)
 [![platform](https://img.shields.io/badge/platform-Web_%7C_Desktop-8E8E93)](https://github.com/simonxluo/dsh-myinfo)
@@ -35,7 +35,7 @@
 - **Career** — company, title, period, work content, salary (current job auto-badged)
 - **Relationships** — people around you and their relation to you, with groups and tags
 - **Reflections** — life notes archived on a dated timeline
-- **Assets** — bank cards, Alipay / WeChat balances, stock-account cash and holdings (e.g. THS A-share positions), totaled per currency; `refresh-prices` pulls free Tencent quotes (A-share / HK / US) in one call to refresh every holding's live price and market value — tickers only, never account info
+- **Assets** — bank cards, Alipay / WeChat balances, stock-account cash and holdings (e.g. THS A-share positions), totaled per currency; `refresh-prices` pulls free Tencent quotes (A-share / HK / US) in one call to refresh every holding's live price and market value — tickers only, never account info. Since v0.10.0 the assets panel, dashboard card and overlay pill also track holdings **live**: a session-aware poller hits the free feed every 3 s during market hours (idle off-hours; prices stay in memory) and re-prices positions and totals in real time, A-share style (red = up, green = down)
 
 ## One data source, five surfaces
 

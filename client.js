@@ -106,6 +106,8 @@ zh: {
 	"ov.updated": "更新于",
 	"stat.bank": "银行卡", "stat.pay": "支付软件", "stat.stock": "股票账户余额", "stat.holdings": "持仓市值", "stat.grand": "总资产",
 	"holdings.of": "持仓明细",
+	"q.live": "实时",
+	"q.stale": "休市",
 	"confirm.delete": "确认删除？",
 	"misc.none": "—",
 },
@@ -162,6 +164,8 @@ en: {
 	"ov.updated": "Updated",
 	"stat.bank": "Bank", "stat.pay": "Payments", "stat.stock": "Stock balance", "stat.holdings": "Holdings value", "stat.grand": "Net total",
 	"holdings.of": "Holdings",
+	"q.live": "Live",
+	"q.stale": "Closed",
 	"confirm.delete": "Delete this entry?",
 	"misc.none": "—",
 },
@@ -190,6 +194,90 @@ async function api(action, payload) {
 		throw new Error((body && body.error && body.error.message) || ("request failed " + res.status));
 	}
 	return body.value;
+}
+
+// ---------------------------------------------------------------------------
+// 实时行情（/_dsh/dsh-myinfo/quotes）：多订阅者共享一个轮询循环。
+// 盘中 3s（免费快照源的实际极限），休市/页面隐藏时降到 15s；失败保留上次快照。
+// ---------------------------------------------------------------------------
+
+const QUOTES_ROUTE = "_dsh/dsh-myinfo/quotes";
+
+const quoteHub = { state: { quotes: null, meta: null }, subs: new Set(), timer: 0, inFlight: false };
+
+function quoteHubNotify() {
+	for (const fn of quoteHub.subs) {
+		try { fn(quoteHub.state); } catch (e) { /* 单个订阅者出错不影响其他 */ }
+	}
+}
+
+function quoteHubSchedule(ms) {
+	if (quoteHub.timer) return;
+	quoteHub.timer = window.setTimeout(quoteHubTick, ms);
+}
+
+async function quoteHubTick() {
+	quoteHub.timer = 0;
+	if (quoteHub.subs.size === 0) return;
+	if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+		quoteHubSchedule(15000);
+		return;
+	}
+	if (!quoteHub.inFlight) {
+		quoteHub.inFlight = true;
+		try {
+			const res = await fetch(QUOTES_ROUTE, { credentials: "same-origin" });
+			const body = await res.json();
+			if (res.ok && body.ok) {
+				quoteHub.state = { quotes: (body.value && body.value.quotes) || {}, meta: body.value || null };
+				quoteHubNotify();
+			}
+		} catch (e) { /* 保留上次快照，下一轮再试 */ } finally {
+			quoteHub.inFlight = false;
+		}
+	}
+	quoteHubSchedule(quoteHub.state.meta && quoteHub.state.meta.live ? 3000 : 15000);
+}
+
+/** 订阅实时行情；enabled=false 时不参与轮询并返回空。 */
+function useLiveQuotes(enabled) {
+	const [state, setState] = useState(quoteHub.state);
+	useEffect(() => {
+		if (!enabled) return undefined;
+		const fn = (s) => setState(s);
+		quoteHub.subs.add(fn);
+		if (quoteHub.subs.size === 1) quoteHubSchedule(100);
+		return () => { quoteHub.subs.delete(fn); };
+	}, [enabled]);
+	return enabled ? state : { quotes: null, meta: null };
+}
+
+/** 有任一持仓命中实时价时返回 { holdingsValue, grand }（CNY 口径），否则 null。 */
+function liveAssets(assets, quotes) {
+	if (!quotes) return null;
+	const holdings = (assets && assets.holdings) || [];
+	let sum = 0;
+	let hit = false;
+	for (const x of holdings) {
+		const shares = x.shares === null || x.shares === undefined ? 0 : x.shares;
+		const q = quotes[x.code];
+		if (q && q.price) { sum += shares * q.price; hit = true; }
+		else sum += shares * (x.price ?? x.costPrice ?? 0);
+	}
+	if (!hit) return null;
+	const cny = assets && assets.totals && assets.totals.totals ? assets.totals.totals.CNY : null;
+	if (!cny) return null;
+	return { holdingsValue: Math.round(sum * 100) / 100, grand: Math.round((cny.grand - cny.holdings + sum) * 100) / 100 };
+}
+
+/** A 股惯例：涨红跌绿。 */
+function pctColor(pct) {
+	if (pct === null || pct === undefined || pct === 0) return "var(--dmi-text-2)";
+	return pct > 0 ? "var(--dmi-red)" : "var(--dmi-green)";
+}
+
+function fmtPct(pct) {
+	return pct === null || pct === undefined ? "" : (pct > 0 ? "+" : "") + pct + "%";
 }
 
 // ---------------------------------------------------------------------------
@@ -931,15 +1019,21 @@ function AssetsTab(props) {
 				h(Btn, { onClick: () => setHoldForm(null) }, t("action.cancel"))));
 	}
 
+	const { quotes, meta } = useLiveQuotes(holdings.length > 0);
+	const live = liveAssets(assets, quotes);
 	const totals = (assets.totals && assets.totals.totals) || {};
 	return h("div", { className: "dmi-root" },
 		h("div", { className: "dmi-stats" },
-			Object.entries(totals).map(([currency, bucket]) => h("div", { key: currency, style: { display: "contents" } },
-				h("div", { className: "dmi-stat" }, h("span", null, t("stat.bank") + " · " + currency), h("b", null, fmtMoney(bucket.bank))),
-				h("div", { className: "dmi-stat" }, h("span", null, t("stat.pay") + " · " + currency), h("b", null, fmtMoney(bucket.pay))),
-				h("div", { className: "dmi-stat" }, h("span", null, t("stat.stock") + " · " + currency), h("b", null, fmtMoney(bucket.stock))),
-				h("div", { className: "dmi-stat" }, h("span", null, t("stat.holdings") + " · " + currency), h("b", null, fmtMoney(bucket.holdings))),
-				h("div", { className: "dmi-stat", style: { borderColor: "color-mix(in srgb, var(--dmi-accent) 45%, transparent)" } }, h("span", null, t("stat.grand") + " · " + currency), h("b", null, fmtMoney(bucket.grand)))))),
+			Object.entries(totals).map(([currency, bucket]) => {
+				const l = currency === "CNY" ? live : null;
+				const liveTag = l ? " · " + (meta && meta.live ? t("q.live") : t("q.stale")) : "";
+				return h("div", { key: currency, style: { display: "contents" } },
+					h("div", { className: "dmi-stat" }, h("span", null, t("stat.bank") + " · " + currency), h("b", null, fmtMoney(bucket.bank))),
+					h("div", { className: "dmi-stat" }, h("span", null, t("stat.pay") + " · " + currency), h("b", null, fmtMoney(bucket.pay))),
+					h("div", { className: "dmi-stat" }, h("span", null, t("stat.stock") + " · " + currency), h("b", null, fmtMoney(bucket.stock))),
+					h("div", { className: "dmi-stat" }, h("span", null, t("stat.holdings") + " · " + currency + liveTag), h("b", { style: l ? { fontVariantNumeric: "tabular-nums" } : undefined }, fmtMoney(l ? l.holdingsValue : bucket.holdings))),
+					h("div", { className: "dmi-stat", style: { borderColor: "color-mix(in srgb, var(--dmi-accent) 45%, transparent)" } }, h("span", null, t("stat.grand") + " · " + currency + liveTag), h("b", { style: l ? { fontVariantNumeric: "tabular-nums" } : undefined }, fmtMoney(l ? l.grand : bucket.grand))));
+			})),
 
 		accounts.length === 0 && holdings.length === 0 ? h("div", { className: "dmi-empty" }, t("empty.assets")) : null,
 		...["bank", "pay", "stock"].map((kind) => {
@@ -957,7 +1051,10 @@ function AssetsTab(props) {
 						h(Btn, { size: "sm", variant: "danger", onClick: () => { if (window.confirm(t("confirm.delete"))) post("account-delete", { id: entry.id }); } }, t("action.delete")))))));
 		}),
 		holdings.length > 0 ? h("div", null,
-			h("div", { className: "dmi-section-title" }, t("holdings.of")),
+			h("div", { className: "dmi-section-title" },
+				t("holdings.of"),
+				meta && meta.quotesAt ? h("span", { className: "dmi-muted", style: { marginLeft: "10px", fontSize: 11 } },
+					(meta.live ? t("q.live") : t("q.stale")) + " · " + String(meta.quotesAt).replace("T", " ").slice(11, 19)) : null),
 			h("table", { className: "dmi-table" },
 				h("thead", null, h("tr", null, ["f.account", "f.code", "f.name", "f.shares", "f.costPrice", "f.price", ""].map((k) => h("th", { key: k }, k === "" ? "" : t(k))))),
 				h("tbody", null, holdings.map((entry) => h("tr", { key: entry.id },
@@ -966,7 +1063,13 @@ function AssetsTab(props) {
 							h("td", null, entry.name || t("misc.none")),
 							h("td", null, entry.shares),
 							h("td", null, entry.costPrice === null || entry.costPrice === undefined ? t("misc.none") : entry.costPrice),
-							h("td", null, entry.price === null || entry.price === undefined ? t("misc.none") : entry.price),
+							h("td", null, (() => {
+								const q = quotes && quotes[entry.code];
+								if (!q || !q.price) return entry.price === null || entry.price === undefined ? t("misc.none") : entry.price;
+								return h("span", { style: { color: pctColor(q.changePct), fontWeight: 600, fontVariantNumeric: "tabular-nums" } },
+									q.price,
+									h("span", { style: { fontSize: 11, marginLeft: 5, fontWeight: 500 } }, fmtPct(q.changePct)));
+							})()),
 							h("td", { style: { whiteSpace: "nowrap" } },
 								h(Btn, { size: "sm", onClick: () => setHoldForm({ id: entry.id, form: holdingFormOf(entry) }) }, t("action.edit")),
 								" ",
@@ -1105,15 +1208,24 @@ function domainSummary(domain, view) {
 	return { stat: "", sub: "", empty: true };
 }
 
-/** 卡片网格里的域卡片：图标 + 摘要 + ›，点击进域详情。 */
+/** 卡片网格里的域卡片：图标 + 摘要 + ›，点击进域详情。资产卡片在交易时段显示实时总资产。 */
 function DomainCard(props) {
 	const sum = domainSummary(props.domain, props.view);
+	const assets = props.view && props.view.assets;
+	const enabled = props.domain === "assets" && ((assets && assets.holdings) || []).length > 0;
+	const { quotes, meta } = useLiveQuotes(enabled);
+	const live = enabled ? liveAssets(assets, quotes) : null;
+	const statNode = live
+		? h("span", { style: { fontVariantNumeric: "tabular-nums" } },
+			fmtMoney(live.grand),
+			h("span", { style: { color: meta && meta.live ? "var(--dmi-green)" : "var(--dmi-text-3)", fontSize: 10, marginLeft: 5 }, title: meta && meta.live ? t("q.live") : t("q.stale") }, "●"))
+		: sum.stat;
 	return h("button", { type: "button", className: "dmi-cardnav", onClick: props.onOpen,
 			"aria-label": t("tab." + props.domain) },
 		h(CardIcon, { domain: props.domain }),
 		h("span", { className: "dmi-cardnav-body" },
 			h("span", { className: "dmi-cardnav-title" }, t("tab." + props.domain)),
-			h("span", { className: "dmi-cardnav-stat" + (sum.empty ? " is-empty" : "") }, sum.stat),
+			h("span", { className: "dmi-cardnav-stat" + (sum.empty && !live ? " is-empty" : "") }, statNode),
 			h("span", { className: "dmi-cardnav-sub" }, sum.sub)),
 		h("span", { className: "dmi-cardnav-chev", "aria-hidden": true }, "›"));
 }
@@ -1132,6 +1244,8 @@ function MyInfoPanel(props, ctx) {
 	const id = (view && view.identity) || {};
 	const totals = view && view.assets && view.assets.totals ? view.assets.totals.totals || {} : {};
 	const grand = totals.CNY ? totals.CNY.grand : null;
+	const { quotes: panelQuotes, meta: panelQuoteMeta } = useLiveQuotes(((view && view.assets && view.assets.holdings) || []).length > 0);
+	const liveGrand = liveAssets(view && view.assets, panelQuotes);
 	const who = [id.name, id.age !== null && id.age !== undefined ? id.age + " 岁" : "", id.residence].filter(Boolean).join(" · ");
 	const inDetail = page !== null && TAB_KEYS.indexOf(page) >= 0;
 	ensureStyle();
@@ -1155,7 +1269,7 @@ function MyInfoPanel(props, ctx) {
 				} }, t("dock.dock")),
 				h(Btn, { size: "sm", busy, onClick: load }, t("action.refresh")),
 				h(ThemeToggle, { ctx }),
-				grand !== null ? h(Chip, { tone: "money", title: t("stat.grand") }, fmtMoney(grand)) : null),
+				grand !== null ? h(Chip, { tone: "money", title: t("stat.grand") + (panelQuoteMeta && panelQuoteMeta.live ? " · " + t("q.live") : "") }, fmtMoney(liveGrand ? liveGrand.grand : grand)) : null),
 		error ? h("div", { className: "dmi-error" }, error) : null,
 		view === null && error === "" ? h("div", { className: "dmi-empty" }, "…") :
 		view === null ? null :
@@ -1191,6 +1305,8 @@ function AssetOverlay(props, ctx) {
 	const totals = (assets.totals && assets.totals.totals) || {};
 	const cny = totals.CNY || null;
 	const hasData = cny !== null || (assets.accounts || []).length > 0;
+	const { quotes: ovQuotes } = useLiveQuotes(((assets.holdings) || []).length > 0);
+	const liveOv = liveAssets(assets, ovQuotes);
 	const themeClass = scopeClassOf(ctx);
 	const openPanel = () => {
 		try {
@@ -1206,13 +1322,13 @@ function AssetOverlay(props, ctx) {
 				onClick: () => { if (hasData) setExpanded(true); else openPanel(); },
 			},
 				h("span", { className: "dmi-ov-dot" }),
-				hasData && cny ? h("b", null, fmtMoney(cny.grand)) : h("span", null, t("ov.empty"))));
+				hasData && cny ? h("b", { style: liveOv ? { fontVariantNumeric: "tabular-nums" } : undefined }, fmtMoney(liveOv ? liveOv.grand : cny.grand)) : h("span", null, t("ov.empty"))));
 	}
 	const rows = cny ? [
 		["🏦", t("stat.bank"), cny.bank],
 		["💚", t("stat.pay"), cny.pay],
 		["📈", t("stat.stock"), cny.stock],
-		["💎", t("stat.holdings"), cny.holdings],
+		["💎", t("stat.holdings"), liveOv ? liveOv.holdingsValue : cny.holdings],
 	] : [];
 	return h("div", { className: "dmi-scope dmi-ov" + themeClass },
 		h("div", { className: "dmi-ov-card" },
@@ -1221,8 +1337,8 @@ function AssetOverlay(props, ctx) {
 				h("span", { style: { display: "inline-flex" } }, h(ThemeToggle, { ctx })),
 				h("button", { className: "dmi-ov-x", title: t("action.cancel"), onClick: () => setExpanded(false) }, "✕")),
 			h("div", { className: "dmi-ov-hero" },
-				h("b", null, cny ? fmtMoney(cny.grand) : t("misc.none")),
-				h("span", null, t("stat.grand") + (view && view.meta && view.meta.updatedAt ? " · " + t("ov.updated") + " " + String(view.meta.updatedAt).replace("T", " ").slice(11, 19) : ""))),
+				h("b", { style: liveOv ? { fontVariantNumeric: "tabular-nums" } : undefined }, cny ? fmtMoney(liveOv ? liveOv.grand : cny.grand) : t("misc.none")),
+				h("span", null, t("stat.grand") + (liveOv ? " · " + t("q.live") : "") + (view && view.meta && view.meta.updatedAt ? " · " + t("ov.updated") + " " + String(view.meta.updatedAt).replace("T", " ").slice(11, 19) : ""))),
 			h("div", { className: "dmi-ov-rows" }, rows.map(([ico, label, val]) =>
 				h("div", { key: label, className: "dmi-ov-row" },
 					h("span", { className: "dmi-ov-row-ico" }, ico),

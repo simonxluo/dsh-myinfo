@@ -453,7 +453,7 @@ const QUOTE_PREFIX_BY_MARKET = [
 	[/^(us|usa)$/i, 'us'], [/美/, 'us'],
 ];
 
-function quotePrefixOf(market) {
+export function quotePrefixOf(market) {
 	const m = String(market ?? '').trim();
 	if (m === '') return '';
 	for (const [re, prefix] of QUOTE_PREFIX_BY_MARKET) {
@@ -463,7 +463,7 @@ function quotePrefixOf(market) {
 }
 
 /** market 留空时按代码推断：6 位数字按首位分流 A 股三市，5 位数字视为港股，含字母视为美股。 */
-function inferPrefixByCode(code) {
+export function inferPrefixByCode(code) {
 	const c = String(code ?? '').trim();
 	if (/^\d{5}$/.test(c)) return 'hk';
 	if (/^\d{6}$/.test(c)) {
@@ -481,7 +481,7 @@ function inferPrefixByCode(code) {
  * 批量拉取腾讯行情：一次请求多个代码，GBK 解码，解析出 名称/现价/昨收。
  * 返回 Map<小写symbol, {name, code, price, prevClose}>；接口没返回的代码不在 Map 里。
  */
-async function fetchQuotes(symbols, fetchImpl) {
+export async function fetchQuotes(symbols, fetchImpl) {
 	const fetchFn = fetchImpl ?? globalThis.fetch;
 	if (typeof fetchFn !== 'function') throw new StoreError('当前运行时没有可用的 fetch');
 	if (symbols.length === 0) return new Map();

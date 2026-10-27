@@ -255,5 +255,48 @@ if (typeof entry.apply !== 'function' || typeof entry.inject !== 'object' || !en
 	throw new Error('index.js should export apply/inject/Config');
 }
 
+// --- v0.10.0 实时行情轮询（quotes.js） ---
+const quotesMod = await import('../quotes.js');
+// ① 交易时段判定（上海时区，与宿主进程时区无关）
+equal(quotesMod.marketOpenAt('sh', new Date('2026-10-27T10:00:00+08:00')), true, 'A股上午盘中');
+equal(quotesMod.marketOpenAt('sh', new Date('2026-10-27T12:00:00+08:00')), false, '午间休市');
+equal(quotesMod.marketOpenAt('sz', new Date('2026-10-27T14:59:30+08:00')), true, 'A股尾盘');
+equal(quotesMod.marketOpenAt('sz', new Date('2026-10-27T15:01:00+08:00')), false, '收盘后');
+equal(quotesMod.marketOpenAt('sh', new Date('2026-10-31T10:00:00+08:00')), false, '周六休市');
+equal(quotesMod.marketOpenAt('hk', new Date('2026-10-27T11:00:00+08:00')), true, '港股上午');
+equal(quotesMod.marketOpenAt('us', new Date('2026-10-27T22:00:00+08:00')), true, '美股夜间粗窗');
+// ② 盘中 tick：注入持仓与 fetch，快照含价格与涨跌幅；跨时区宿主（UTC 时刻）也应正确
+const tencentBody = 'v_sh600519="1~GUizhouMaotai~600519~1611.0~1600.0~1605.0~1620.0~1598.0~...";';
+const fakeFetch = async () => ({ ok: true, status: 200, arrayBuffer: async () => new TextEncoder().encode(tencentBody) });
+const poller = quotesMod.createQuotePoller({
+	now: () => new Date('2026-10-27T02:00:00Z'), // = 上海 10:00，宿主若在 UTC 也应判为盘中
+	loadHoldings: () => [{ code: '600519', market: 'SH', shares: 10 }],
+	fetchImpl: fakeFetch,
+});
+await poller.tick();
+const snap = poller.snapshot();
+equal(snap.live, true, '盘中 tick 后 live=true');
+equal(snap.sessionOpen, true);
+equal(snap.quotes['600519'].price, 1611, '最新价取 parts[3]');
+equal(snap.quotes['600519'].changePct, 0.69, '涨跌幅= (1611-1600)/1600');
+// ③ 休市：完全不出网，live=false 但保留最后快照
+let fetched = 0;
+const countingFetch = async () => { fetched += 1; return fakeFetch(); };
+const idlePoller = quotesMod.createQuotePoller({
+	now: () => new Date('2026-10-27T12:00:00+08:00'),
+	loadHoldings: () => [{ code: '600519', market: 'SH', shares: 10 }],
+	fetchImpl: countingFetch,
+	intervalMs: 10,
+});
+await idlePoller.tick();
+equal(idlePoller.snapshot().live, false, '午休不轮询');
+equal(fetched, 0, '休市不应发出任何请求');
+idlePoller.stop();
+// ④ 客户端回归：实时视图的锚点都在
+if (!clientSrc.includes('dsh-myinfo/quotes')) throw new Error('client should poll the quotes route');
+if (!clientSrc.includes('function useLiveQuotes')) throw new Error('useLiveQuotes hook missing');
+if (!clientSrc.includes('function liveAssets')) throw new Error('liveAssets helper missing');
+if (!clientSrc.includes('"q.live"')) throw new Error('live locale keys missing');
+
 rmSync(dir, { recursive: true, force: true });
 console.log('ALL HOST TESTS PASSED (incl. audit regressions)');

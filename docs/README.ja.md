@@ -6,7 +6,7 @@
 
 **[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 向けローカル限定の個人プロファイルプラグイン——私は誰か、何をしてきたか、誰が周りにいるか、何を気づいたか、何を所有しているか。**
 
-[![version](https://img.shields.io/badge/version-0.8.0-0071e3)](https://github.com/simonxluo/dsh-myinfo/releases)
+[![version](https://img.shields.io/badge/version-0.10.0-0071e3)](https://github.com/simonxluo/dsh-myinfo/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-34c759)](https://github.com/simonxluo/dsh-myinfo/blob/main/LICENSE)
 [![DeepSeek Harness](https://img.shields.io/badge/DeepSeek_Harness-%E2%89%A5_0.2.1--rc.1-8957e5)](https://github.com/deepseek-ai/deepseek-harness)
 [![platform](https://img.shields.io/badge/platform-Web_%7C_Desktop-8E8E93)](https://github.com/simonxluo/dsh-myinfo)
@@ -35,7 +35,7 @@
 - **職歴** — 会社、役職、期間、業務内容、給与（現職を自動バッジ表示）
 - **人間関係** — 周囲の人と自分との関係、グループ / タグ
 - **人生の気づき** — 日付順にアーカイブされるタイムライン
-- **資産台帳** — 銀行カード、Alipay / WeChat 残高、証券口座の現金と保有銘柄（同花順 A 株など）、通貨別に自動集計。`refresh-prices` はテンセントの無料株価 API（A株・香港・米国）を1回呼び出して全保有銘柄の現在値と評価額を一括更新——送信するのは銘柄コードのみで口座情報は送らない
+- **資産台帳** — 銀行カード、Alipay / WeChat 残高、証券口座の現金と保有銘柄（同花順 A 株など）、通貨別に自動集計。`refresh-prices` はテンセントの無料株価 API（A株・香港・米国）を1回呼び出して全保有銘柄の現在値と評価額を一括更新——送信するのは銘柄コードのみで口座情報は送らない。v0.10.0 からは資産パネル・ダッシュボードカード・オーバーレイが**リアルタイム行情**に対応：取引時間中は3秒ごとに無料スナップショット源をポーリングし、保有額と総資産を即時再評価（場外は送信なし、価格はメモリのみ、中国式の赤上げ緑下げ）
 
 ## ひとつのデータ、5つの入口
 

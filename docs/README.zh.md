@@ -6,7 +6,7 @@
 
 **[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 本机个人信息档案插件——我是谁、我做过什么、我身边有谁、我想通了什么、我有多少资产。**
 
-[![version](https://img.shields.io/badge/version-0.8.0-0071e3)](https://github.com/simonxluo/dsh-myinfo/releases)
+[![version](https://img.shields.io/badge/version-0.10.0-0071e3)](https://github.com/simonxluo/dsh-myinfo/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-34c759)](https://github.com/simonxluo/dsh-myinfo/blob/main/LICENSE)
 [![DeepSeek Harness](https://img.shields.io/badge/DeepSeek_Harness-%E2%89%A5_0.2.1--rc.1-8957e5)](https://github.com/deepseek-ai/deepseek-harness)
 [![platform](https://img.shields.io/badge/platform-Web_%7C_Desktop-8E8E93)](https://github.com/simonxluo/dsh-myinfo)
@@ -35,7 +35,7 @@
 - **工作经历**：公司、职位、时间、内容、薪资（当前在职自动标记）
 - **人际关系**：周围的人与和我的关系，分组 / 标签
 - **人生感悟**：按日期归档的时间线
-- **资产台账**：银行卡、支付宝、微信余额；股票账户余额与持仓（如同花顺 A 股持仓），按币种自动汇总；`refresh-prices` 一键拉取腾讯免费行情（A股/港股/美股）批量刷新全部持仓现价与市值——只发送证券代码，绝不发送账户信息
+- **资产台账**：银行卡、支付宝、微信余额；股票账户余额与持仓（如同花顺 A 股持仓），按币种自动汇总；`refresh-prices` 一键拉取腾讯免费行情（A股/港股/美股）批量刷新全部持仓现价与市值——只发送证券代码，绝不发送账户信息。v0.10.0 起资产面板、仪表盘卡片与右下角浮窗还支持**实时行情**：交易时段内每 3 秒轮询免费快照源，实时重估持仓与总资产（休市不出网；价格只进内存，涨红跌绿）
 
 ## 一份数据、五个入口
 

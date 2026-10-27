@@ -18,6 +18,7 @@ import {
 import { nextIdIn } from './ids.js';
 
 export const PANEL_ROUTE = '/_dsh/dsh-myinfo/panel';
+export const QUOTES_ROUTE = '/_dsh/dsh-myinfo/quotes';
 
 const LOCAL_HOSTNAMES = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
 
@@ -170,9 +171,33 @@ function applyAction(body) {
 	}
 }
 
-/** 挂载面板路由；由 index.js 在 webServer 可用时调用。 */
-export function installPanelWeb(ctx) {
+/** 挂载面板路由；由 index.js 在 webServer 可用时调用。poller 非空时加挂实时行情只读路由。 */
+export function installPanelWeb(ctx, poller) {
 	ctx.inject(['webServer'], (webCtx) => {
+		if (poller !== null && poller !== undefined) {
+			webCtx.effect(() => webCtx.webServer.register({
+				kind: 'exact',
+				path: QUOTES_ROUTE,
+				handler: async (request, response) => {
+					const remote = String(request.socket?.remoteAddress ?? '');
+					if (remote !== '127.0.0.1' && remote !== '::1' && remote !== '::ffff:127.0.0.1') {
+						sendPanelJson(response, 403, { ok: false, error: { code: 'forbidden', message: 'dsh-myinfo quotes is localhost-only' } });
+						return;
+					}
+					const host = hostVerdict(request.headers.host);
+					if (host !== undefined) {
+						sendPanelJson(response, 403, { ok: false, error: { code: 'forbidden', message: host } });
+						return;
+					}
+					if (request.method !== 'GET') {
+						response.writeHead(405, { allow: 'GET' });
+						response.end();
+						return;
+					}
+					sendPanelJson(response, 200, { ok: true, value: poller.snapshot() });
+				},
+			}));
+		}
 		webCtx.effect(() => webCtx.webServer.register({
 			kind: 'exact',
 			path: PANEL_ROUTE,

@@ -6,7 +6,7 @@
 
 **Un dossier personal de carácter local para [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) — quién soy, qué he hecho, quién me rodea, qué he entendido y qué poseo.**
 
-[![version](https://img.shields.io/badge/version-0.8.0-0071e3)](https://github.com/simonxluo/dsh-myinfo/releases)
+[![version](https://img.shields.io/badge/version-0.10.0-0071e3)](https://github.com/simonxluo/dsh-myinfo/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-34c759)](https://github.com/simonxluo/dsh-myinfo/blob/main/LICENSE)
 [![DeepSeek Harness](https://img.shields.io/badge/DeepSeek_Harness-%E2%89%A5_0.2.1--rc.1-8957e5)](https://github.com/deepseek-ai/deepseek-harness)
 [![platform](https://img.shields.io/badge/platform-Web_%7C_Desktop-8E8E93)](https://github.com/simonxluo/dsh-myinfo)
@@ -35,7 +35,7 @@
 - **Carrera** — empresa, puesto, periodo, contenido del trabajo y salario (el empleo actual se etiqueta solo)
 - **Relaciones** — las personas de tu entorno y su relación contigo, con grupos y etiquetas
 - **Reflexiones** — notas de vida archivadas en una línea de tiempo por fecha
-- **Patrimonio** — tarjetas bancarias, saldos de Alipay / WeChat, efectivo y posiciones de cuentas de valores (p. ej. acciones A de THS), totalizados por divisa; `refresh-prices` obtiene en una sola llamada cotizaciones gratuitas de Tencent (acciones A / HK / EE. UU.) y actualiza el precio y valor de mercado de todas las posiciones — solo se envían códigos de valores, nunca información de la cuenta
+- **Patrimonio** — tarjetas bancarias, saldos de Alipay / WeChat, efectivo y posiciones de cuentas de valores (p. ej. acciones A de THS), totalizados por divisa; `refresh-prices` obtiene en una sola llamada cotizaciones gratuitas de Tencent (acciones A / HK / EE. UU.) y actualiza el precio y valor de mercado de todas las posiciones — solo se envían códigos de valores, nunca información de la cuenta. Desde v0.10.0 el panel de activos, la tarjeta del tablero y la píldora flotante muestran cotizaciones **en vivo**: durante la sesión el sondeo consulta la fuente gratuita cada 3 s y revaloriza posiciones y totales en tiempo real (sin tráfico fuera de horario; precios solo en memoria, rojo sube / verde baja)
 
 ## Un origen de datos, cinco superficies
 
